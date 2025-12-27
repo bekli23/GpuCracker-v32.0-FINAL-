@@ -31,6 +31,15 @@ vcpkg install openssl:x64-windows secp256k1:x64-windows
 2. Set configuration to **Release | x64**.
 3. Ensure **CUDA 12.4 Build Customizations** are enabled.
 4. Build the solution (`Ctrl+Shift+B`). The binary `GpuCracker.exe` will be generated in `bin\x64\Release\`.
+5. Build for linux
+sudo apt update
+sudo apt install build-essential libssl-dev libsecp256k1-dev ocl-icd-opencl-dev libomp-dev
+make
+Build Again
+After applying these changes, clean your previous build attempts and run make again:
+
+make clean
+make -j$(nproc) or make
 
 ---
 
