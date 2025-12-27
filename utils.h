@@ -1,4 +1,5 @@
 #pragma once
+
 #include <vector>
 #include <string>
 #include <sstream>
@@ -14,23 +15,25 @@ typedef unsigned long long ulong;
 typedef unsigned int uint;
 typedef unsigned char uchar;
 
-// Librării externe
+// Librării externe pentru criptografie
 #include <secp256k1.h>
 #include <openssl/sha.h>
 #include <openssl/ripemd.h>
 #include <openssl/hmac.h>
 #include <openssl/evp.h>
 
-// Networking Windows
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
+// --- GESTIONARE CROSS-PLATFORM (Windows vs Linux) ---
+#ifdef _WIN32
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+    #include <windows.h>
+    #include <wininet.h>
+    #pragma comment(lib, "wininet.lib")
 #else
-    // Add any Linux-specific headers if needed, otherwise leave empty
     #include <unistd.h>
-#include <wininet.h>
-#pragma comment(lib, "wininet.lib")
+    #include <arpa/inet.h>
+#endif
 
 // =============================================================
 // SECTIUNEA 1: IMPLEMENTARE BECH32 (SegWit Native)
@@ -102,11 +105,24 @@ namespace Bech32 {
 // SECTIUNEA 2: UTILITARE HASH, BASE58 & HEX
 // =============================================================
 
+inline std::string hideString(const std::string& input, int visibleLen = 4) {
+    if (input.length() <= (size_t)visibleLen * 2) return input;
+    return input.substr(0, visibleLen) + "..." + input.substr(input.length() - visibleLen);
+}
+
 inline std::string toHex(const std::vector<uint8_t>& data) {
     std::stringstream ss;
     ss << std::hex << std::setfill('0');
     for (uint8_t b : data) ss << std::setw(2) << (int)b;
     return ss.str();
+}
+
+inline std::vector<uint8_t> fromHex(const std::string& hex) {
+    std::vector<uint8_t> bytes;
+    for (size_t i = 0; i < hex.length(); i += 2) {
+        bytes.push_back((uint8_t)strtol(hex.substr(i, 2).c_str(), NULL, 16));
+    }
+    return bytes;
 }
 
 inline void Hash160(const std::vector<uint8_t>& input, std::vector<uint8_t>& output) {
@@ -241,7 +257,7 @@ inline std::string PubKeyToNativeSegwit(const std::vector<uint8_t>& pubKeyBytes)
 }
 
 // =============================================================
-// SECTIUNEA 5: ONLINE API CHECKER
+// SECTIUNEA 5: ONLINE API CHECKER (Windows Only)
 // =============================================================
 
 struct OnlineInfo {
@@ -253,6 +269,7 @@ struct OnlineInfo {
 
 inline OnlineInfo CheckAddressOnline(const std::string& address) {
     OnlineInfo info;
+#ifdef _WIN32
     HINTERNET hInt = InternetOpenA("GpuCracker/4.0", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hInt) return info;
 
@@ -279,6 +296,7 @@ inline OnlineInfo CheckAddressOnline(const std::string& address) {
         if (pos == std::string::npos) return "0";
         size_t start = response.find(":", pos) + 1;
         size_t end = response.find_first_of(",}", start);
+        if (start >= response.length() || end == std::string::npos) return "0";
         std::string val = response.substr(start, end - start);
         val.erase(std::remove(val.begin(), val.end(), ' '), val.end());
         return val;
@@ -287,5 +305,9 @@ inline OnlineInfo CheckAddressOnline(const std::string& address) {
     info.totalReceived = extract("\"total_received\"");
     info.txCount = extract("\"n_tx\"");
     info.success = true;
+#else
+    // Fallback pentru Linux (necesită libcurl pentru implementare)
+    info.success = false;
+#endif
     return info;
 }

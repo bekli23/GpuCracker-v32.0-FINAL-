@@ -28,9 +28,13 @@
 #endif
 #include <CL/cl.h>
 
+// Bridge către kernel-urile GPU (CUDA)
 extern "C" void launch_gpu_akm_search(unsigned long long start, unsigned long long count, int b, int t, const void* bf, size_t sz, unsigned long long* res, int* cnt, int bits);
 extern "C" void launch_gpu_mnemonic_search(unsigned long long start, unsigned long long count, int b, int t, const void* bf, size_t sz, unsigned long long* res, int* cnt);
 
+// =============================================================
+// GĂRZI CONSOLĂ ȘI PLATFORMĂ (Windows vs Linux)
+// =============================================================
 #ifdef _WIN32
 #include <windows.h>
 inline void setupConsole() {
@@ -39,15 +43,14 @@ inline void setupConsole() {
     SetConsoleMode(hOut, dwMode); SetConsoleOutputCP(65001); 
     CONSOLE_CURSOR_INFO ci; GetConsoleCursorInfo(hOut, &ci); ci.bVisible = false; SetConsoleCursorInfo(hOut, &ci);
 }
-#else
-    // Add any Linux-specific headers if needed, otherwise leave empty
-    #include <unistd.h>
 inline void restoreConsole() {
     HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
     CONSOLE_CURSOR_INFO ci; GetConsoleCursorInfo(hOut, &ci); ci.bVisible = true; SetConsoleCursorInfo(hOut, &ci);
 }
 #else
-inline void setupConsole() {} inline void restoreConsole() {}
+#include <unistd.h>
+inline void setupConsole() {} 
+inline void restoreConsole() {}
 #endif
 
 inline void moveTo(int r, int c) { std::cout << "\033[" << r << ";" << c << "H"; }
@@ -112,10 +115,8 @@ private:
 
     std::string formatUnits(double num, const std::string& unit) {
         const char* suffixes[] = { "", " K", " M", " B", " T", " Q" };
-        int i = 0;
-        while (num >= 1000 && i < 5) { num /= 1000; i++; }
-        std::stringstream ss;
-        ss << std::fixed << std::setprecision(2) << num << suffixes[i] << " " << unit;
+        int i = 0; while (num >= 1000 && i < 5) { num /= 1000; i++; }
+        std::stringstream ss; ss << std::fixed << std::setprecision(2) << num << suffixes[i] << " " << unit;
         return ss.str();
     }
 
@@ -186,8 +187,8 @@ public:
         totalCores = std::thread::hardware_concurrency();
         workerCores = (cfg.cpuCores > 0) ? cfg.cpuCores : totalCores;
         setupConsole();
-        if (cfg.runMode == "mnemonic") mnemonicTool.loadWordlist("english.txt");
-        else if (cfg.runMode == "akm") akmTool.init(cfg.akmProfile, "akm\\wordlist_512_ascii.txt");
+        if (cfg.runMode == "mnemonic") mnemonicTool.loadWordlist(cfg.language);
+        else if (cfg.runMode == "akm") akmTool.init(cfg.akmProfile, "akm/wordlist_512_ascii.txt");
         if (!cfg.bloomFile.empty()) bloom.load(cfg.bloomFile);
         detectHardware();
     }
@@ -198,6 +199,7 @@ public:
         std::cout << "\033[2J\033[H=== GpuCracker v32.0 (FINAL) ===\n";
         for (const auto& gpu : activeGpus) {
             std::string memInfo = "Shared/Global";
+#ifdef _WIN32
             if (gpu.backend == "CUDA") {
                 size_t f = 0, t = 0; cudaSetDevice(gpu.deviceId); 
                 if (cudaMemGetInfo(&f, &t) == cudaSuccess) {
@@ -205,16 +207,15 @@ public:
                     memInfo = ss.str();
                 }
             }
+#endif
             std::cout << "GPU " << gpu.globalId << ": \033[1;33m" << gpu.provider->getName() << "\033[0m (" << gpu.backend << ")\n";
             std::cout << "Conf:   \033[1;36m" << gpu.provider->getConfig() << "\033[0m | VRAM: " << memInfo << "\n";
         }
-        std::string ompStatus = (workerCores > 1) ? "\033[1;32mActive (OpenMP)\033[0m" : "\033[1;31mDisabled\033[0m";
-        std::cout << "CPU:    Using " << workerCores << "/" << totalCores << " Cores (" << ompStatus << ")\n";
-
+        std::cout << "CPU:    Using " << workerCores << "/" << totalCores << " Cores (" << (workerCores>1?"Active":"Disabled") << ")\n";
+        
         if (cfg.runMode == "akm") {
-            int wordsNum = (!cfg.akmLengths.empty()) ? cfg.akmLengths[0] : cfg.words;
-            std::cout << "Mode:   AKM | Profile: " << cfg.akmProfile << "\n";
-            std::cout << "Gen:    " << cfg.akmGenMode << " | Words: " << wordsNum << "\n";
+            int w = (!cfg.akmLengths.empty()) ? cfg.akmLengths[0] : 10;
+            std::cout << "Mode:   AKM | Profile: " << cfg.akmProfile << "\nGen:    " << cfg.akmGenMode << " | Words: " << w << "\n";
             if (!cfg.akmBits.empty()) {
                 std::cout << "Ranges: "; for(int b : cfg.akmBits) std::cout << "2^" << b << " "; std::cout << "\n";
             }
@@ -267,17 +268,14 @@ public:
         int foundCount = 0;
         std::mt19937_64 rng(std::random_device{}() + gpuIdx);
         size_t bitRotationIdx = 0;
-        int phraseLen = (!cfg.akmLengths.empty()) ? cfg.akmLengths[0] : cfg.words;
+        int phraseLen = (!cfg.akmLengths.empty()) ? cfg.akmLengths[0] : 10;
 
         auto lastUiUpdate = std::chrono::high_resolution_clock::now();
 
         while (running) {
             unsigned long long currentTaskSize = batchSize;
             unsigned long long base;
-            int bit = 0;
-            if (cfg.runMode == "akm" && !cfg.akmBits.empty()) {
-                bit = cfg.akmBits[bitRotationIdx % cfg.akmBits.size()]; bitRotationIdx++;
-            }
+            int bit = (cfg.runMode == "akm" && !cfg.akmBits.empty()) ? cfg.akmBits[bitRotationIdx++ % cfg.akmBits.size()] : 0;
 
             if (!cfg.infinite && cfg.count > 0) {
                 base = totalSeedsChecked.fetch_add(batchSize);
@@ -287,13 +285,9 @@ public:
                 base = (cfg.mnemonicOrder == "random") ? rng() : totalSeedsChecked.fetch_add(batchSize);
             }
 
-            if (bloom.isLoaded()) {
-                if (gpu.backend == "CUDA") {
-                    if (cfg.runMode == "akm") launch_gpu_akm_search(base, currentTaskSize, cfg.cudaBlocks, cfg.cudaThreads, bloom.getRawData(), bloom.getSize(), foundSeeds, &foundCount, bit);
-                    else launch_gpu_mnemonic_search(base, currentTaskSize, cfg.cudaBlocks, cfg.cudaThreads, bloom.getRawData(), bloom.getSize(), foundSeeds, &foundCount);
-                } else {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                }
+            if (bloom.isLoaded() && gpu.backend == "CUDA") {
+                if (cfg.runMode == "akm") launch_gpu_akm_search(base, currentTaskSize, cfg.cudaBlocks, cfg.cudaThreads, bloom.getRawData(), bloom.getSize(), foundSeeds, &foundCount, bit);
+                else launch_gpu_mnemonic_search(base, currentTaskSize, cfg.cudaBlocks, cfg.cudaThreads, bloom.getRawData(), bloom.getSize(), foundSeeds, &foundCount);
             }
 
             if (foundCount > 0) {
@@ -306,6 +300,7 @@ public:
                          for (auto& r : res.rows) if (r.isHit) logDetailedHit("HIT MNEM", std::to_string(foundSeeds[i]), res.mnemonic, r.addr, "-", r.path);
                     }
                 }
+                foundCount = 0;
             }
 
             auto now = std::chrono::high_resolution_clock::now();
@@ -323,7 +318,6 @@ public:
                 }
             }
 
-            // LOGICA SELECTIVA PENTRU VITEZA
             unsigned long long increment = cfg.showRealSpeed ? currentTaskSize : (currentTaskSize * 4);
             totalAddressesChecked.fetch_add(increment);
         }
