@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{922D8127-D5C6-F115-DA6F-B9479A71209C}</ProjectGuid>
+    <RootNamespace>GpuCracker</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>GpuCracker</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.4.props" />
+  </ImportGroup>
+
+  <PropertyGroup>
+    <OutDir>$(SolutionDir)bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <TargetName>GpuCracker</TargetName>
+  </PropertyGroup>
+  
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;ENABLE_VULKAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>$(CudaToolkitIncludeDir);C:\VulkanSDK\1.4.335.0\Include;$(VULKAN_SDK)\Include;C:\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OpenMPSupport>true</OpenMPSupport>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <SubSystem>Console</SubSystem>
+      <AdditionalLibraryDirectories>$(CudaToolkitLibDir);C:\VulkanSDK\1.4.335.0\Lib;$(VULKAN_SDK)\Lib;C:\vcpkg\installed\x64-windows\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;OpenCL.lib;cudart.lib;curand.lib;libssl.lib;libcrypto.lib;secp256k1.lib;kernel32.lib;user32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <CudaCompile>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+      <CodeGeneration>compute_50,sm_50;compute_52,sm_52;compute_60,sm_60;compute_61,sm_61;compute_70,sm_70;compute_75,sm_75;compute_80,sm_80;compute_86,sm_86;compute_87,sm_87;compute_89,sm_89;compute_90,sm_90</CodeGeneration>
+      <FastMath>true</FastMath>
+      <AdditionalOptions>-allow-unsupported-compiler -std=c++17 -Xcompiler "/openmp" %(AdditionalOptions)</AdditionalOptions>
+    </CudaCompile>
+    <PostBuildEvent>
+      <Command>
+        echo Copying Dependencies...
+        xcopy /y /d "C:\vcpkg\installed\x64-windows\bin\*.dll" "$(OutDir)"
+        if exist "$(ProjectDir)bip39" xcopy /y /s /i "$(ProjectDir)bip39" "$(OutDir)bip39"
+        if exist "$(ProjectDir)akm" xcopy /y /s /i "$(ProjectDir)akm" "$(OutDir)akm"
+        if exist "akm_vulkan.spv" xcopy /y /d "akm_vulkan.spv" "$(OutDir)"
+      </Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;ENABLE_VULKAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>$(CudaToolkitIncludeDir);C:\VulkanSDK\1.4.335.0\Include;$(VULKAN_SDK)\Include;C:\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OpenMPSupport>true</OpenMPSupport>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <AdditionalLibraryDirectories>$(CudaToolkitLibDir);C:\VulkanSDK\1.4.335.0\Lib;$(VULKAN_SDK)\Lib;C:\vcpkg\installed\x64-windows\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;OpenCL.lib;cudart.lib;curand.lib;libssl.lib;libcrypto.lib;secp256k1.lib;kernel32.lib;user32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <CudaCompile>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+      <CodeGeneration>compute_50,sm_50;compute_61,sm_61;compute_75,sm_75;compute_86,sm_86;compute_90,sm_90</CodeGeneration>
+      <AdditionalOptions>-allow-unsupported-compiler -std=c++17 -Xcompiler "/openmp" %(AdditionalOptions)</AdditionalOptions>
+    </CudaCompile>
+  </ItemDefinitionGroup>
+  
+  <ItemGroup>
+    <CudaCompile Include="main.cu" />
+    <CudaCompile Include="kernel_ops.cu" />
+    <CudaCompile Include="GpuCore.cu" />
+    <CudaCompile Include="cuda_provider.cu" />
+    <CudaCompile Include="mnemonic_gpu.cu" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <CustomBuild Include="akm_kernel.glsl">
+      <FileType>Document</FileType>
+      <Command>"C:\VulkanSDK\1.4.335.0\Bin\glslc.exe" -fshader-stage=compute "%(Identity)" -o "akm_vulkan.spv"</Command>
+      <Outputs>akm_vulkan.spv</Outputs>
+      <Message>Compiling Vulkan Compute Shader (GLSL to SPV)...</Message>
+    </CustomBuild>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ClInclude Include="utils.h" />
+    <ClInclude Include="kernel_ops.cuh" />
+    <ClInclude Include="bloom.h" />
+    <ClInclude Include="args.h" />
+    <ClInclude Include="runner.h" />
+    <ClInclude Include="opencl_wrapper.h" />
+    <ClInclude Include="gpu_interface.h" />
+    <ClInclude Include="cuda_provider.h" />
+    <ClInclude Include="opencl_provider.h" />
+    <ClInclude Include="vulkan_provider.h" />
+    <ClInclude Include="akm.h" />
+    <ClInclude Include="akm_extra.h" />
+    <ClInclude Include="mode_akm.h" />
+    <ClInclude Include="mnemonic.h" />
+  </ItemGroup>
+  
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.4.targets" />
+  </ImportGroup>
+</Project>

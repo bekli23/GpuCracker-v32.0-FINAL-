@@ -1,0 +1,97 @@
+#version 450
+layout(local_size_x = 64) in;
+
+struct OutputData {
+    uint data[8]; // 32 bytes (256 bits)
+};
+
+// Binding 0: Bufferul de iesire
+layout(std430, binding = 0) buffer OutputBuffer {
+    uint result[];
+} outputBuf;
+
+// Push Constants pentru argumente rapide
+layout(push_constant) uniform Constants {
+    uint64_t baseSeed;
+    uint points;
+    uint useSequential;
+    uint entropyBytes;
+} pc;
+
+// Xoshiro256** implementation
+uint64_t rotl(uint64_t x, int k) {
+    return (x << k) | (x >> (64 - k));
+}
+
+uint64_t next(inout uint64_t s[4]) {
+    const uint64_t result = rotl(s[1] * 5, 7) * 9;
+    const uint64_t t = s[1] << 17;
+    s[2] ^= s[0];
+    s[3] ^= s[1];
+    s[1] ^= s[2];
+    s[0] ^= s[3];
+    s[2] ^= t;
+    s[3] = rotl(s[3], 45);
+    return result;
+}
+
+// SplitMix64 pentru initializare
+uint64_t splitmix64(inout uint64_t x) {
+    uint64_t z = (x += 0x9e3779b97f4a7c15UL);
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9UL;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111ebUL;
+    return z ^ (z >> 31);
+}
+
+uint swap_endian(uint val) {
+    return ((val >> 24) & 0xff) | ((val << 8) & 0xff0000) |
+           ((val >> 8) & 0xff00) | ((val << 24) & 0xff000000);
+}
+
+void main() {
+    uint gid = gl_GlobalInvocationID.x;
+    
+    // State local
+    uint64_t s[4];
+    
+    if (pc.useSequential == 0) {
+        uint64_t seed = pc.baseSeed + gid;
+        s[0] = splitmix64(seed);
+        s[1] = splitmix64(seed);
+        s[2] = splitmix64(seed);
+        s[3] = splitmix64(seed);
+    }
+
+    uint counterOffsetWords = (pc.entropyBytes / 4) - 2;
+    if (counterOffsetWords < 0) counterOffsetWords = 0;
+
+    for (uint i = 0; i < pc.points; i++) {
+        uint outIdx = (gid * pc.points) + i;
+        uint baseWordOffset = outIdx * 8; // 32 bytes = 8 uints
+
+        if (pc.useSequential == 1) {
+            uint64_t uniqueId = pc.baseSeed + outIdx;
+            // Clear buffer
+            for(int k=0; k<8; k++) outputBuf.result[baseWordOffset + k] = 0;
+            
+            outputBuf.result[baseWordOffset + counterOffsetWords]     = swap_endian(uint(uniqueId >> 32));
+            outputBuf.result[baseWordOffset + counterOffsetWords + 1] = swap_endian(uint(uniqueId & 0xFFFFFFFF));
+        } else {
+            uint64_t r1 = next(s);
+            uint64_t r2 = next(s);
+            uint64_t r3 = next(s);
+            uint64_t r4 = next(s);
+            
+            // Scriem uint-uri (Vulkan e Little Endian de obicei, dar outputBuf e raw)
+            // Despachetam 64bit in 32bit
+            outputBuf.result[baseWordOffset + 0] = uint(r1 & 0xFFFFFFFF);
+            outputBuf.result[baseWordOffset + 1] = uint(r1 >> 32);
+            outputBuf.result[baseWordOffset + 2] = uint(r2 & 0xFFFFFFFF);
+            outputBuf.result[baseWordOffset + 3] = uint(r2 >> 32);
+            outputBuf.result[baseWordOffset + 4] = uint(r3 & 0xFFFFFFFF);
+            outputBuf.result[baseWordOffset + 5] = uint(r3 >> 32);
+            outputBuf.result[baseWordOffset + 6] = uint(r4 & 0xFFFFFFFF);
+            outputBuf.result[baseWordOffset + 7] = uint(r4 >> 32);
+        }
+    }
+}
