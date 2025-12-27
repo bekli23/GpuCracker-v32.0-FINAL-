@@ -10,19 +10,7 @@
 #include <iostream>
 #include <cstdint>
 
-// --- TIPURI DE DATE ---
-typedef unsigned long long ulong;
-typedef unsigned int uint;
-typedef unsigned char uchar;
-
-// Librării externe pentru criptografie
-#include <secp256k1.h>
-#include <openssl/sha.h>
-#include <openssl/ripemd.h>
-#include <openssl/hmac.h>
-#include <openssl/evp.h>
-
-// --- GESTIONARE CROSS-PLATFORM (Windows vs Linux) ---
+// --- CROSS-PLATFORM SYSTEM HEADERS ---
 #ifdef _WIN32
     #ifndef WIN32_LEAN_AND_MEAN
         #define WIN32_LEAN_AND_MEAN
@@ -30,13 +18,27 @@ typedef unsigned char uchar;
     #include <windows.h>
     #include <wininet.h>
     #pragma comment(lib, "wininet.lib")
+    
+    // Windows doesn't always define these, so we guard them
+    typedef unsigned long long ulong;
+    typedef unsigned int uint;
+    typedef unsigned char uchar;
 #else
     #include <unistd.h>
     #include <arpa/inet.h>
+    #include <sys/types.h>
+    // On Linux, ulong/uint/uchar are already defined in sys/types.h
 #endif
 
+// External Libraries for Cryptography
+#include <secp256k1.h>
+#include <openssl/sha.h>
+#include <openssl/ripemd.h>
+#include <openssl/hmac.h>
+#include <openssl/evp.h>
+
 // =============================================================
-// SECTIUNEA 1: IMPLEMENTARE BECH32 (SegWit Native)
+// SECTION 1: BECH32 IMPLEMENTATION (Native SegWit)
 // =============================================================
 namespace Bech32 {
     inline constexpr char const* charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
@@ -102,7 +104,7 @@ namespace Bech32 {
 }
 
 // =============================================================
-// SECTIUNEA 2: UTILITARE HASH, BASE58 & HEX
+// SECTION 2: HASH, BASE58 & HEX UTILITIES
 // =============================================================
 
 inline std::string hideString(const std::string& input, int visibleLen = 4) {
@@ -167,7 +169,7 @@ inline std::string EncodeBase58Check(const std::vector<uint8_t>& input) {
 }
 
 // =============================================================
-// SECTIUNEA 3: CRYPTO CORE (BIP32)
+// SECTION 3: CRYPTO CORE (BIP32)
 // =============================================================
 
 struct ExtendedKey {
@@ -227,7 +229,7 @@ inline ExtendedKey Derive(const ExtendedKey& parent, uint32_t index, secp256k1_c
 }
 
 // =============================================================
-// SECTIUNEA 4: CONVERTOARE ADRESE
+// SECTION 4: ADDRESS CONVERTERS
 // =============================================================
 
 inline std::string PubKeyToLegacy(const std::vector<uint8_t>& pubKeyBytes) {
@@ -257,7 +259,7 @@ inline std::string PubKeyToNativeSegwit(const std::vector<uint8_t>& pubKeyBytes)
 }
 
 // =============================================================
-// SECTIUNEA 5: ONLINE API CHECKER (Windows Only)
+// SECTION 5: ONLINE API CHECKER (Windows Only)
 // =============================================================
 
 struct OnlineInfo {
@@ -306,7 +308,7 @@ inline OnlineInfo CheckAddressOnline(const std::string& address) {
     info.txCount = extract("\"n_tx\"");
     info.success = true;
 #else
-    // Fallback pentru Linux (necesită libcurl pentru implementare)
+    // Fallback for Linux (requires libcurl implementation if needed)
     info.success = false;
 #endif
     return info;
