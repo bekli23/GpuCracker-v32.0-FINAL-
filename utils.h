@@ -26,6 +26,9 @@ typedef unsigned char uchar;
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#else
+    // Add any Linux-specific headers if needed, otherwise leave empty
+    #include <unistd.h>
 #include <wininet.h>
 #pragma comment(lib, "wininet.lib")
 

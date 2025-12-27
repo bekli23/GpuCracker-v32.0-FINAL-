@@ -39,6 +39,9 @@ inline void setupConsole() {
     SetConsoleMode(hOut, dwMode); SetConsoleOutputCP(65001); 
     CONSOLE_CURSOR_INFO ci; GetConsoleCursorInfo(hOut, &ci); ci.bVisible = false; SetConsoleCursorInfo(hOut, &ci);
 }
+#else
+    // Add any Linux-specific headers if needed, otherwise leave empty
+    #include <unistd.h>
 inline void restoreConsole() {
     HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
     CONSOLE_CURSOR_INFO ci; GetConsoleCursorInfo(hOut, &ci); ci.bVisible = true; SetConsoleCursorInfo(hOut, &ci);
