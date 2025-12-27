@@ -49,6 +49,9 @@ struct ProgramConfig {
     // --- ADDRESS SETTINGS ---
     // Suporta: ALL, LEGACY, P2PKH, P2SH, SEGWIT, P2WPKH, P2WSH, TAPROOT, BARE
     std::string setAddress = "ALL";
+
+    // --- OPTIUNI VITEZA ---
+    bool showRealSpeed = false; // Flag pentru --speed (viteza reala fara multiplicatori)
     
     // --- FLAGS ---
     bool help = false; 
@@ -89,6 +92,7 @@ inline ProgramConfig parseArgs(int argc, char* argv[]) {
         // --- GENERAL ---
         else if (arg == "--infinite") cfg.infinite = true;
         else if (arg == "--count" && i + 1 < argc) cfg.count = std::stoull(argv[++i]);
+        else if (arg == "--speed") cfg.showRealSpeed = true;
         else if (arg == "--help" || arg == "-h") cfg.help = true;
         else if (arg == "--quiet") cfg.verbose = false;
         
@@ -122,10 +126,10 @@ inline ProgramConfig parseArgs(int argc, char* argv[]) {
     if (cfg.runMode == "akm") {
         if (cfg.akmLengths.empty()) {
             if (cfg.words > 0) cfg.akmLengths = { cfg.words };
-            else cfg.akmLengths = { 10 }; // Default 10 cuvinte pentru AKM
+            else cfg.akmLengths = { 10 }; 
         }
     } else {
-        if (cfg.words == 0) cfg.words = 12; // Default 12 cuvinte pentru Mnemonic
+        if (cfg.words == 0) cfg.words = 12;
     }
 
     return cfg;
@@ -146,7 +150,7 @@ inline void printHelp() {
     std::cout << "  --profile NAME      Select AKM Profile (e.g., akm3-puzzle71)\n";
     std::cout << "  --input FILE        Input text file with phrases (Alias for --akm-file)\n";
     std::cout << "  --akm-phrase STR    Check a single specific phrase\n";
-    std::cout << "  --words N           Set FIXED length for AKM gen (overrides default)\n";
+    std::cout << "  --words N           Set FIXED length for AKM gen (overrides default list)\n";
     std::cout << "  --akm-word LIST     Set multiple lengths (e.g. '3,5,10').\n";
     std::cout << "  --akm-mode MODE     Gen mode: random | schematic | wave\n";
     std::cout << "  --akm-bit LIST      Limit bits (e.g. '71,72')\n";
@@ -156,7 +160,8 @@ inline void printHelp() {
     std::cout << "  --bloom-keys FILE   Path to the Bloom Filter file (.blf)\n";
     std::cout << "  --infinite          Run continuously without stopping.\n";
     std::cout << "  --count N           Stop after checking N seeds.\n";
-    std::cout << "  --win FILE          File path to save hits (Default: win.txt)\n";
+    std::cout << "  --speed             Show real GPU seed generation speed (no multipliers).\n";
+    std::cout << "  --win FILE          File path to save successful hits (Default: win.txt)\n";
     
     std::cout << "\n--- CPU PERFORMANCE ---\n";
     std::cout << "  --cores N           Limit the number of CPU cores used.\n";

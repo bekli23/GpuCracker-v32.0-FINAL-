@@ -28,7 +28,6 @@
 #endif
 #include <CL/cl.h>
 
-// Linkage către kernel-urile GPU (CUDA)
 extern "C" void launch_gpu_akm_search(unsigned long long start, unsigned long long count, int b, int t, const void* bf, size_t sz, unsigned long long* res, int* cnt, int bits);
 extern "C" void launch_gpu_mnemonic_search(unsigned long long start, unsigned long long count, int b, int t, const void* bf, size_t sz, unsigned long long* res, int* cnt);
 
@@ -223,7 +222,9 @@ public:
 
         std::cout << "\n\033[1;37mClasses of Attack Strategy:\033[0m\n";
         std::cout << "Class A: 10K h/s | \033[1;32mClass B: 1M h/s (GPU Experimental)\033[0m\n";
-        std::cout << "Class C: 100M h/s | Class D: 1B+ h/s\nStatus: \033[1;33mClass B GPU logic experimental active\033[0m\n";
+        std::cout << "Class C: 100M h/s | Class D: 1B+ h/s\n";
+        std::cout << "Status: \033[1;33mClass B GPU logic experimental active" 
+                  << (cfg.showRealSpeed ? " [REAL SPEED MODE]" : "") << "\033[0m\n";
 
         uiBaseLine = 22; 
         moveTo(uiBaseLine, 1);
@@ -248,9 +249,11 @@ public:
             if (row.isHit) std::cout << "\033[1;32mHIT\033[0m"; else std::cout << "-";
             std::cout << "\033[K";
         }
+        
+        std::string speedLabel = cfg.showRealSpeed ? "Real Speed: " : "Speed: ";
         moveTo(r + 1, 1);
         std::cout << "Total: " << formatUnits((double)totalAddressesChecked.load(), "addr") 
-                  << " | Speed: " << formatUnits((double)totalAddressesChecked.load() / secs, "addr/s") << "\033[0m\033[K" << std::flush;
+                  << " | " << speedLabel << "\033[1;32m" << formatUnits((double)totalAddressesChecked.load() / secs, "addr/s") << "\033[0m\033[K" << std::flush;
     }
 
     void workerClassBGPU(int gpuIdx) {
@@ -263,7 +266,6 @@ public:
         size_t bitRotationIdx = 0;
         int phraseLen = (!cfg.akmLengths.empty()) ? cfg.akmLengths[0] : cfg.words;
 
-        // Timer pentru optimizare GPU Load
         auto lastUiUpdate = std::chrono::high_resolution_clock::now();
 
         while (running) {
@@ -276,8 +278,8 @@ public:
 
             if (!cfg.infinite && cfg.count > 0) {
                 base = totalSeedsChecked.fetch_add(batchSize);
-                if (base >= cfg.count) { running = false; break; }
-                if (base + batchSize > cfg.count) currentTaskSize = cfg.count - base;
+                if (base >= (unsigned long long)cfg.count) { running = false; break; }
+                if (base + batchSize > (unsigned long long)cfg.count) currentTaskSize = (unsigned long long)cfg.count - base;
             } else {
                 base = (cfg.mnemonicOrder == "random") ? rng() : totalSeedsChecked.fetch_add(batchSize);
             }
@@ -291,7 +293,6 @@ public:
                 }
             }
 
-            // HIT HANDLING (Prioritate Maxima)
             if (foundCount > 0) {
                 for (int i = 0; i < foundCount; i++) {
                     if (cfg.runMode == "akm") {
@@ -304,7 +305,6 @@ public:
                 }
             }
 
-            // OPTIMIZARE: UI Update decuplat de GPU (doar la 1000ms)
             auto now = std::chrono::high_resolution_clock::now();
             if (gpuIdx == 0 && std::chrono::duration_cast<std::chrono::milliseconds>(now - lastUiUpdate).count() > 1000) {
                 lastUiUpdate = now;
@@ -320,8 +320,9 @@ public:
                 }
             }
 
-            // Logica Over-counting conform cerintei
-            totalAddressesChecked.fetch_add(currentTaskSize * 4);
+            // LOGICA SELECTIVA PENTRU VITEZA
+            unsigned long long increment = cfg.showRealSpeed ? currentTaskSize : (currentTaskSize * 4);
+            totalAddressesChecked.fetch_add(increment);
         }
         delete[] foundSeeds;
     }
