@@ -8,32 +8,44 @@
 #include <iomanip>
 #include <cstring>
 
-// OpenSSL
+// OpenSSL - Necesar pentru validarea checksum-ului adreselor
 #include <openssl/sha.h>
 #include <openssl/ripemd.h>
 
 #define DEFAULT_FP_RATE 0.0000001
-#define MIN_BLOOM_SIZE_BITS (8 * 1024 * 1024) // Minimum 1 MB
+#define MIN_BLOOM_SIZE_BITS (8 * 1024 * 1024) // Minimum 1 MB (8388608 biți)
 
-typedef unsigned long long ulong;
-typedef unsigned int uint;
+// --- REZOLVARE CONFLICTE TIPURI (Cross-Platform) ---
+#ifdef _WIN32
+    typedef unsigned long long ulong;
+    typedef unsigned int uint;
+#else
+    #include <sys/types.h>
+    // Pe Linux, ulong și uint sunt deja definite în sys/types.h
+#endif
 
 // ============================================================================
 //  MURMURHASH3 (IDENTIC CU CEL DIN BLOOM.H / GPU)
 // ============================================================================
 inline uint32_t rotl32(uint32_t x, int8_t r) { return (x << r) | (x >> (32 - r)); }
+
 inline uint32_t MurmurHash3_x86_32(const void* key, int len, uint32_t seed) {
     const uint8_t* data = (const uint8_t*)key;
     const int nblocks = len / 4;
     uint32_t h1 = seed;
     const uint32_t c1 = 0xcc9e2d51;
     const uint32_t c2 = 0x1b873593;
-    const uint32_t* blocks = (const uint32_t*)(data + nblocks * 4);
+
+    // Folosim memcpy pentru a evita erorile de aliniere (Bus Error) pe Linux
+    const uint8_t* blocks = (data + nblocks * 4);
     for (int i = -nblocks; i; i++) {
-        uint32_t k1 = blocks[i];
+        uint32_t k1;
+        memcpy(&k1, blocks + (i * 4), 4);
+
         k1 *= c1; k1 = rotl32(k1, 15); k1 *= c2;
         h1 ^= k1; h1 = rotl32(h1, 13); h1 = h1 * 5 + 0xe6546b64;
     }
+
     const uint8_t* tail = (const uint8_t*)(data + nblocks * 4);
     uint32_t k1 = 0;
     switch (len & 3) {
@@ -42,11 +54,12 @@ inline uint32_t MurmurHash3_x86_32(const void* key, int len, uint32_t seed) {
     case 1: k1 ^= tail[0];
             k1 *= c1; k1 = rotl32(k1, 15); k1 *= c2; h1 ^= k1;
     };
+
     h1 ^= len; h1 ^= h1 >> 16; h1 *= 0x85ebca6b; h1 ^= h1 >> 13; h1 *= 0xc2b2ae35; h1 ^= h1 >> 16;
     return h1;
 }
 
-// Helpers
+// Helpers pentru scriere Big-Endian (Format BLM3)
 void write_be64(std::ofstream& f, uint64_t val) {
     uint8_t bytes[8]; for (int i=0; i<8; ++i) bytes[7-i] = (val >> (i*8)) & 0xFF;
     f.write((char*)bytes, 8);
@@ -60,15 +73,15 @@ void DoubleSHA256(const void* data, size_t len, uint8_t* output) {
     SHA256(hash1, SHA256_DIGEST_LENGTH, output);
 }
 
-// Decoding Logic
+// Logica de decodare Base58 pentru adrese Legacy/P2SH
 const char* pszBase58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 int8_t mapBase58[256];
 void InitBase58() { memset(mapBase58, -1, sizeof(mapBase58)); for (int i = 0; pszBase58[i]; i++) mapBase58[(uint8_t)pszBase58[i]] = i; }
 
 bool DecodeBase58Check(const std::string& str, std::vector<uint8_t>& vchRet) {
     if (mapBase58['1'] == -1) InitBase58();
-    int zeros = 0; while (zeros < str.size() && str[zeros] == '1') zeros++;
-    std::vector<unsigned char> b58(str.size() * 733 / 1000 + 10); memset(b58.data(), 0, b58.size());
+    int zeros = 0; while (zeros < (int)str.size() && str[zeros] == '1') zeros++;
+    std::vector<unsigned char> b58(str.size() * 733 / 1000 + 10, 0);
     int length = 0;
     for (char c : str) {
         if (mapBase58[(uint8_t)c] == -1) return false;
@@ -91,6 +104,7 @@ bool DecodeBase58Check(const std::string& str, std::vector<uint8_t>& vchRet) {
     return true;
 }
 
+// Logica de decodare Bech32 pentru adrese Native SegWit
 namespace Bech32 {
     uint32_t polymod(const std::vector<uint8_t>& values) {
         static const uint32_t GEN[5] = {0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3};
@@ -115,10 +129,10 @@ namespace Bech32 {
         return true;
     }
 }
+
 bool DecodeBech32(const std::string& str, std::vector<uint8_t>& vchRet) {
     if(str.size()>90 || str.size()<8) return false;
-    std::string bech=str; 
-    for(char& c:bech) c=std::tolower(c);
+    std::string bech=str; for(char& c:bech) c=std::tolower(c);
     size_t pos=bech.rfind('1');
     if(pos==std::string::npos || pos==0 || pos+7>bech.size()) return false;
     std::string hrp=bech.substr(0, pos);
@@ -138,40 +152,20 @@ bool DecodeBech32(const std::string& str, std::vector<uint8_t>& vchRet) {
     return true;
 }
 
-// --- HELP FUNCTION ---
 void print_help() {
     std::cout << "DESCRIPTION:\n";
-    std::cout << "  This utility reads text files containing Bitcoin addresses (Legacy/Bech32)\n";
-    std::cout << "  and creates an optimized Bloom Filter (.blf) file.\n\n";
+    std::cout << "  High-speed Bitcoin address to Bloom Filter (.blf) converter.\n\n";
     std::cout << "USAGE:\n";
     std::cout << "  build_bloom.exe --input <file> [options]\n\n";
     std::cout << "OPTIONS:\n";
-    std::cout << "  --input <file>      : Path to the text file containing addresses.\n";
-    std::cout << "                        (You can use this argument multiple times to merge files)\n";
+    std::cout << "  --input <file>      : Path to address list (.txt). Can be used multiple times.\n";
     std::cout << "  --out <file>        : Output filename (Default: out.blf)\n";
     std::cout << "  --p <rate>          : False Positive Rate (Default: 0.0000001)\n";
-    std::cout << "                        ---------------------------------------------------------\n";
-    std::cout << "                        RECOMMENDATION:\n";
-    std::cout << "                        * 0.0000001 (Default): Best balance. Extremely rare false alarms.\n";
-    std::cout << "                        * 0.001: Smaller file size, but frequent false positives.\n";
-    std::cout << "                        * 0.000000001: Larger file size, practically zero errors.\n";
-    std::cout << "                        ---------------------------------------------------------\n";
-    std::cout << "  --help              : Show this help message.\n\n";
-    std::cout << "EXAMPLES:\n";
-    std::cout << "  1. Simple usage:\n";
-    std::cout << "     build_bloom.exe --input addresses.txt\n\n";
-    std::cout << "  2. Specific output name and higher accuracy:\n";
-    std::cout << "     build_bloom.exe --input btc.txt --out database.blf --p 0.00000001\n\n";
-    std::cout << "  3. Merge multiple files:\n";
-    std::cout << "     build_bloom.exe --input list1.txt --input list2.txt --out full.blf\n";
+    std::cout << "  --help              : Show this message.\n";
 }
 
 int main(int argc, char* argv[]) {
-    // Dacă nu sunt argumente, afișează help și ieși
-    if (argc < 2) {
-        print_help();
-        return 0;
-    }
+    if (argc < 2) { print_help(); return 0; }
 
     InitBase58(); 
     std::vector<std::string> inputs;
@@ -183,21 +177,13 @@ int main(int argc, char* argv[]) {
         if(arg=="--input" && i+1<argc) inputs.push_back(argv[++i]);
         else if(arg=="--out" && i+1<argc) outputFile = argv[++i];
         else if(arg=="--p" && i+1<argc) fpRate = std::stod(argv[++i]);
-        else if(arg=="--help" || arg=="-h") {
-            print_help();
-            return 0;
-        }
+        else if(arg=="--help" || arg=="-h") { print_help(); return 0; }
     }
 
-    if(inputs.empty()) { 
-        std::cerr << "Error: No input files provided.\n";
-        print_help();
-        return 1; 
-    }
+    if(inputs.empty()) { std::cerr << "Error: No input files.\n"; return 1; }
 
     std::cout << "--- Bloom Builder v6.0 (Double Hashing - GPU Compatible) ---\n";
 
-    // 1. Scan count
     uint64_t n=0;
     for(const auto& file : inputs) {
         std::ifstream f(file);
@@ -210,20 +196,17 @@ int main(int argc, char* argv[]) {
     std::cout << "Total Valid Entries: " << n << "\n";
     if(n==0) return 1;
 
-    // 2. Calc Params
+    // Calcul dimensiune optimă (m) și număr hash-uri (k)
     double m_d = -1.0 * n * log(fpRate) / pow(log(2.0), 2.0);
     uint64_t m = (uint64_t)ceil(m_d);
     if (m < MIN_BLOOM_SIZE_BITS) m = MIN_BLOOM_SIZE_BITS;
-    m = ((m + 63) / 64) * 64; 
+    m = ((m + 63) / 64) * 64; // Aliniere la 64 biți
 
-    // k fixed to 30 for consistency with GPU (IMPORTANT!)
-    uint32_t k = 30; 
-
+    uint32_t k = 30; // FIXAT la 30 pentru compatibilitate cu loop-ul constant din GPU
     std::cout << "Bloom Params: m=" << m << " bits | k=" << k << "\n";
 
     std::vector<uint8_t> bitarray(m/8, 0);
 
-    // 3. Populate
     for(const auto& file : inputs) {
         std::ifstream f(file);
         std::string line;
@@ -240,13 +223,11 @@ int main(int argc, char* argv[]) {
             else if(addr.substr(0,3)=="bc1") valid = DecodeBech32(addr, payload);
 
             if(valid && payload.size() == 20) {
-                // === DOUBLE HASHING ===
-                // Aceste seed-uri sunt CRITICE sa fie identice cu bloom.h
+                // Seed-uri critice Murmur3: 0xFBA4C795 și 0x43876932
                 uint32_t h1 = MurmurHash3_x86_32(payload.data(), 20, 0xFBA4C795);
                 uint32_t h2 = MurmurHash3_x86_32(payload.data(), 20, 0x43876932);
 
                 for(uint32_t i=0; i<k; ++i) {
-                    // Formula exacta folosita in runner.h si GpuCore.cu
                     uint64_t idx = ((uint64_t)h1 + (uint64_t)i * h2) % m;
                     bitarray[idx/8] |= (1<<(idx%8));
                 }
@@ -259,7 +240,7 @@ int main(int argc, char* argv[]) {
     uint8_t ver=3; out.write((char*)&ver, 1);
     write_be64(out, m); 
     write_be32(out, k); 
-    write_be64(out, bitarray.size());
+    write_be64(out, (uint64_t)bitarray.size());
     out.write((char*)bitarray.data(), bitarray.size());
     
     std::cout << "[DONE] Bloom Filter Created: " << outputFile << "\n";
