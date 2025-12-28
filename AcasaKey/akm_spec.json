@@ -1,0 +1,132 @@
+{
+  "AKM_PARAMS": {
+    "version": "AKM2",
+    "wl": 512,
+    "token": "hexpack8",
+    "cs": {
+      "v1": true,
+      "v2": true,
+      "v2_words": 2,
+      "v2_bits_per_word": 10
+    }
+  },
+  "INTEGRITY": {
+    "WORDS_HASH": "5230f9e27d26f0b1c5283ddd56b8a0e8a08a3adec061fa31b9cf11b46f6bd63b",
+    "CUSTOM_HEX_HASH": "dcf6e339f6d747c60f573f255ac02c9483f5d0f05f436ef18f7e0938bbda47c3",
+    "SPECIAL_RULES_HASH": "d888e14ef378e6f2fc925b0132c6169c98d15b2334b3be54e676d5e5985b2fed",
+    "AKM_PARAMS_HASH": "75497319643970102ff8d3bc88118f01b3bbeaa52a4170a9c29fb01d6d1f6691"
+  },
+  "TOKEN_MODE": "hexpack8",
+  "HAS_CS_V1": true,
+  "HAS_CS_V2": true,
+  "SPECIAL_RULES": {
+    "abis": {
+      "fixed8": "00000001"
+    },
+    "ora": {
+      "fixed8": "12991299"
+    },
+    "lac": {
+      "fixed8": "01991550"
+    },
+    "lumina": {
+      "fixed8": "1234c0de"
+    }
+  },
+  "CUSTOM_HEX_KEYS": [
+    "acelasi",
+    "acoperis",
+    "adanc",
+    "adapost",
+    "adorare",
+    "aer",
+    "afectiune",
+    "ajun",
+    "alb",
+    "albastru",
+    "alge",
+    "altar",
+    "amintire",
+    "amurg",
+    "anotimp",
+    "apa",
+    "mare"
+  ],
+  "ACTIVE_PROFILE": "akm2-core",
+  "TEST_VECTORS": [
+    {
+      "phrase": [
+        "mare",
+        "mare",
+        "mare"
+      ],
+      "key_hex": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "token8": [
+        "0000a732",
+        "0000a732",
+        "0000a732"
+      ],
+      "cs_v1_mode": "no_cs",
+      "cs_v1": [
+        "valea"
+      ],
+      "cs_v2_mode": "no_cs",
+      "cs_v2": [
+        "burg",
+        "frag"
+      ]
+    },
+    {
+      "phrase": [
+        "apele",
+        "apele",
+        "apele",
+        "apele",
+        "apele"
+      ],
+      "key_hex": "f104ac98f104ac98f104ac98f104ac98f104ac98f104ac98f104ac98f104ac98",
+      "token8": [
+        "f104ac98",
+        "f104ac98",
+        "f104ac98",
+        "f104ac98",
+        "f104ac98"
+      ],
+      "cs_v1_mode": "no_cs",
+      "cs_v1": [
+        "duminica"
+      ],
+      "cs_v2_mode": "no_cs",
+      "cs_v2": [
+        "urme",
+        "pietris"
+      ]
+    },
+    {
+      "phrase": [
+        "aer",
+        "apa",
+        "abis",
+        "ajun",
+        "alb"
+      ],
+      "key_hex": "0ae1a38700a05d19000000010a1a2c7b0a1c2a960ae1a38700a05d1900000001",
+      "token8": [
+        "0ae1a387",
+        "00a05d19",
+        "00000001",
+        "0a1a2c7b",
+        "0a1c2a96"
+      ],
+      "cs_v1_mode": "no_cs",
+      "cs_v1": [
+        "ecouri"
+      ],
+      "cs_v2_mode": "no_cs",
+      "cs_v2": [
+        "vaza",
+        "zar"
+      ]
+    }
+  ]
+}
