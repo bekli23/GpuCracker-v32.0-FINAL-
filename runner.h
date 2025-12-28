@@ -12,6 +12,9 @@
 #include <algorithm>
 #include <omp.h>
 #include <fstream>
+#include <sstream>
+#include <map>
+#include <random>
 
 #include "args.h"
 #include "gpu_interface.h"
@@ -28,12 +31,18 @@
 #endif
 #include <CL/cl.h>
 
+#include <openssl/sha.h>
+#include <openssl/ripemd.h>
+#include <openssl/hmac.h>
+#include <openssl/evp.h>
+#include <secp256k1.h>
+
 // Bridge către kernel-urile GPU (CUDA)
 extern "C" void launch_gpu_akm_search(unsigned long long start, unsigned long long count, int b, int t, const void* bf, size_t sz, unsigned long long* res, int* cnt, int bits);
 extern "C" void launch_gpu_mnemonic_search(unsigned long long start, unsigned long long count, int b, int t, const void* bf, size_t sz, unsigned long long* res, int* cnt);
 
 // =============================================================
-// GĂRZI CONSOLĂ ȘI PLATFORMĂ (Windows vs Linux)
+// GĂRZI CONSOLĂ ȘI PLATFORMĂ
 // =============================================================
 #ifdef _WIN32
 #include <windows.h>
@@ -55,21 +64,18 @@ inline void restoreConsole() {}
 
 inline void moveTo(int r, int c) { std::cout << "\033[" << r << ";" << c << "H"; }
 
+struct Scheme { std::string name; std::string path; int type; };
+
 struct DisplayState {
     unsigned long long countId = 0;
     std::string mnemonic = "-";
     std::string hexKey = "-";
-    struct AddrInfo { std::string type, path, addr; bool isHit; };
+    struct AddrInfo { std::string type, path, addr; std::string status; bool isHit; };
     std::vector<AddrInfo> rows;
     int currentBit = 0;
 };
 
-struct ActiveGpuContext { 
-    IGpuProvider* provider; 
-    std::string backend; 
-    int deviceId; 
-    int globalId;
-};
+struct ActiveGpuContext { IGpuProvider* provider; std::string backend; int deviceId; int globalId; };
 
 class Runner {
 private:
@@ -85,32 +91,20 @@ private:
     std::mutex displayMutex, fileMutex;
     DisplayState currentDisplay;
     std::vector<ActiveGpuContext> activeGpus;
+    std::vector<unsigned char*> hostBuffers;
     std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
     
-    int uiBaseLine = 22; 
-    int totalCores = 0;
-    int workerCores = 0;
+    int uiBaseLine = 22; int totalCores = 0; int workerCores = 0;
+    bool isInputMode = false;
 
     bool isAddressTypeMatch(const std::string& typeStr, const std::string& pathStr, std::string filter) {
         if (filter.empty() || filter == "ALL") return true;
         std::string f = filter; std::transform(f.begin(), f.end(), f.begin(), ::toupper);
-        std::string searchZone = typeStr + " " + pathStr;
-        std::transform(searchZone.begin(), searchZone.end(), searchZone.begin(), ::toupper);
-        
-        if (f == "LEGACY" || f == "P2PKH") {
-            return (searchZone.find("P2PKH") != std::string::npos || searchZone.find("LEGACY") != std::string::npos || 
-                    searchZone.find("BIP44") != std::string::npos || searchZone.find("M/44'") != std::string::npos);
-        }
-        if (f == "P2SH") {
-            return (searchZone.find("P2SH") != std::string::npos || searchZone.find("NESTED") != std::string::npos || 
-                    searchZone.find("BIP49") != std::string::npos || searchZone.find("M/49'") != std::string::npos);
-        }
-        if (f == "SEGWIT" || f == "P2WPKH") {
-            return (searchZone.find("BECH32") != std::string::npos || searchZone.find("P2WPKH") != std::string::npos || 
-                    searchZone.find("NATIVE") != std::string::npos || searchZone.find("BIP84") != std::string::npos ||
-                    searchZone.find("M/84'") != std::string::npos);
-        }
-        return (searchZone.find(f) != std::string::npos);
+        std::string sZ = typeStr + " " + pathStr; std::transform(sZ.begin(), sZ.end(), sZ.begin(), ::toupper);
+        if (f == "LEGACY" || f == "P2PKH") return (sZ.find("P2PKH") != std::string::npos || sZ.find("LEGACY") != std::string::npos);
+        if (f == "P2SH") return (sZ.find("P2SH") != std::string::npos || sZ.find("NESTED") != std::string::npos);
+        if (f == "SEGWIT") return (sZ.find("BECH32") != std::string::npos || sZ.find("NATIVE") != std::string::npos);
+        return (sZ.find(f) != std::string::npos);
     }
 
     std::string formatUnits(double num, const std::string& unit) {
@@ -124,62 +118,25 @@ private:
         std::lock_guard<std::mutex> lock(fileMutex);
         std::ofstream file(cfg.winFile, std::ios::app);
         if (!file.is_open()) return;
-        auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-        file << "\n=== HIT " << mode << " [" << std::put_time(std::localtime(&now), "%Y-%m-%d %H:%M:%S") << "] ===\n"
-             << "Seed: " << info << "\nPhrase: " << secret << "\nAddress: " << addr << "\nPrivKey: " << pk << "\nPath: " << path << "\n================\n";
+        file << "\n=== HIT " << mode << " ===\nSeed: " << info << "\nPhrase: " << secret << "\nAddress: " << addr << "\nPrivKey: " << pk << "\nPath: " << path << "\n================\n";
+        file.close();
     }
 
     void detectHardware() {
-        int globalIndex = 0;
-        bool useAll = (cfg.deviceId == -1);
-        std::vector<std::string> addedDeviceNames;
-
-        if (cfg.gpuType == "auto" || cfg.gpuType == "cuda") {
-            int cudaCount = 0;
-            if (cudaGetDeviceCount(&cudaCount) == cudaSuccess) {
-                for (int i = 0; i < cudaCount; i++) {
-                    if (useAll || cfg.deviceId == globalIndex) {
-                        try {
-                            auto* p = new CudaProvider(i, cfg.cudaBlocks, cfg.cudaThreads, cfg.pointsPerThread, true);
-                            p->init();
-                            activeGpus.push_back({ p, "CUDA", i, globalIndex });
-                            addedDeviceNames.push_back(p->getName());
-                        } catch (...) {}
-                    }
-                    globalIndex++;
+        int gIdx = 0; bool useAll = (cfg.deviceId == -1);
+        int cudaCount = 0;
+        if (cudaGetDeviceCount(&cudaCount) == cudaSuccess) {
+            for (int i = 0; i < cudaCount; i++) {
+                if (useAll || cfg.deviceId == gIdx) {
+                    try {
+                        auto* p = new CudaProvider(i, cfg.cudaBlocks, cfg.cudaThreads, cfg.pointsPerThread, true);
+                        p->init(); activeGpus.push_back({ p, "CUDA", i, gIdx });
+                    } catch (...) {}
                 }
+                gIdx++;
             }
         }
-
-        if (cfg.gpuType == "auto" || cfg.gpuType == "opencl") {
-            cl_uint nPlat = 0; clGetPlatformIDs(0, nullptr, &nPlat);
-            if (nPlat > 0) {
-                std::vector<cl_platform_id> platforms(nPlat); clGetPlatformIDs(nPlat, platforms.data(), nullptr);
-                for (auto& platform : platforms) {
-                    cl_uint nDev = 0; clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, nullptr, &nDev);
-                    if (nDev > 0) {
-                        std::vector<cl_device_id> devices(nDev); clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, nDev, devices.data(), nullptr);
-                        for (int i = 0; i < (int)nDev; i++) {
-                            char name[128]; clGetDeviceInfo(devices[i], CL_DEVICE_NAME, 128, name, nullptr);
-                            std::string devName(name);
-                            bool isDup = false;
-                            for(const auto& a : addedDeviceNames) if(devName.find(a) != std::string::npos) isDup = true;
-                            if (cfg.gpuType == "auto" && isDup) { globalIndex++; continue; } 
-
-                            if (useAll || cfg.deviceId == globalIndex) {
-                                try {
-                                    int totalThreads = cfg.cudaBlocks * cfg.cudaThreads;
-                                    auto* p = new OpenClProvider(0, i, totalThreads, cfg.pointsPerThread, true);
-                                    p->init();
-                                    activeGpus.push_back({ p, "OpenCL", i, globalIndex });
-                                } catch (...) {}
-                            }
-                            globalIndex++;
-                        }
-                    }
-                }
-            }
-        }
+        for(auto& gpu : activeGpus) hostBuffers.push_back(new unsigned char[(size_t)gpu.provider->getBatchSize() * 32]);
     }
 
 public:
@@ -187,13 +144,15 @@ public:
         totalCores = std::thread::hardware_concurrency();
         workerCores = (cfg.cpuCores > 0) ? cfg.cpuCores : totalCores;
         setupConsole();
-        if (cfg.runMode == "mnemonic") mnemonicTool.loadWordlist(cfg.language);
-        else if (cfg.runMode == "akm") akmTool.init(cfg.akmProfile, "akm/wordlist_512_ascii.txt");
+        if (cfg.runMode == "akm") {
+            if (cfg.akmListProfiles) { akmTool.listProfiles(); exit(0); }
+            akmTool.init(cfg.akmProfile, "akm/wordlist_512_ascii.txt");
+        } else mnemonicTool.loadWordlist(cfg.language);
         if (!cfg.bloomFile.empty()) bloom.load(cfg.bloomFile);
         detectHardware();
     }
 
-    ~Runner() { restoreConsole(); for (auto& g : activeGpus) if(g.provider) delete g.provider; }
+    ~Runner() { restoreConsole(); for (auto& g : activeGpus) if(g.provider) delete g.provider; for (auto* b : hostBuffers) delete[] b; }
 
     void drawInterface() {
         std::cout << "\033[2J\033[H=== GpuCracker v32.0 (FINAL) ===\n";
@@ -212,124 +171,119 @@ public:
             std::cout << "Conf:   \033[1;36m" << gpu.provider->getConfig() << "\033[0m | VRAM: " << memInfo << "\n";
         }
         std::cout << "CPU:    Using " << workerCores << "/" << totalCores << " Cores (" << (workerCores>1?"Active":"Disabled") << ")\n";
-        
         if (cfg.runMode == "akm") {
-            int w = (!cfg.akmLengths.empty()) ? cfg.akmLengths[0] : 10;
-            std::cout << "Mode:   AKM | Profile: " << cfg.akmProfile << "\nGen:    " << cfg.akmGenMode << " | Words: " << w << "\n";
+            int wordsNum = (!cfg.akmLengths.empty()) ? cfg.akmLengths[0] : 10;
+            std::cout << "Mode:   AKM | Profile: " << cfg.akmProfile << "\nGen:    " << cfg.akmGenMode << " | Words: " << wordsNum << "\n";
             if (!cfg.akmBits.empty()) {
                 std::cout << "Ranges: "; for(int b : cfg.akmBits) std::cout << "2^" << b << " "; std::cout << "\n";
             }
-        } else {
-            std::cout << "Lang:   " << cfg.language << " | Words: " << cfg.words << " | Order: " << cfg.mnemonicOrder << "\n";
         }
-        std::cout << "Filter: " << (cfg.setAddress.empty() ? "ALL" : cfg.setAddress) << "\n";
+        std::cout << "Filter: " << (cfg.setAddress.empty() ? "ALL" : cfg.setAddress) << "\n\n";
 
-        std::cout << "\n\033[1;37mClasses of Attack Strategy:\033[0m\n";
+        // Adăugare Classes of Attack Strategy
+        std::cout << "\033[1;37mClasses of Attack Strategy:\033[0m\n";
         std::cout << "Class A: 10K h/s | \033[1;32mClass B: 1M h/s (GPU Experimental)\033[0m\n";
         std::cout << "Class C: 100M h/s | Class D: 1B+ h/s\n";
-        std::cout << "Status: \033[1;33mClass B GPU logic experimental active" 
-                  << (cfg.showRealSpeed ? " [REAL SPEED MODE]" : "") << "\033[0m\n";
+        std::cout << "Status: \033[1;33mClass B GPU logic experimental active" << (cfg.showRealSpeed ? " [REAL]" : "") << "\033[0m\n";
 
-        uiBaseLine = 22; 
-        moveTo(uiBaseLine, 1);
+        uiBaseLine = 22; moveTo(uiBaseLine, 1);
         std::cout << "Seed #\nPhrase:\nPrivKey:\n\nTYPE      PATH                      ADDRESS                                     STATUS\n--------------------------------------------------------------------------------------\n";
     }
 
     void updateStats() {
         DisplayState s; { std::lock_guard<std::mutex> lock(displayMutex); s = currentDisplay; }
-        auto now = std::chrono::high_resolution_clock::now();
-        double secs = std::chrono::duration<double>(now - startTime).count();
-        if (secs <= 0) secs = 0.001;
-
-        moveTo(uiBaseLine, 8); 
-        std::cout << s.countId << (cfg.runMode == "akm" ? " [Bit: " + std::to_string(s.currentBit) + "]" : "") << "\033[K";
+        double secs = std::max(0.001, std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - startTime).count());
+        moveTo(uiBaseLine, 8); std::cout << s.countId << (cfg.runMode == "akm" ? " [Bit: " + std::to_string(s.currentBit) + "]" : "") << "\033[K";
         moveTo(uiBaseLine + 1, 9); std::cout << s.mnemonic << "\033[K";
         moveTo(uiBaseLine + 2, 11); std::cout << s.hexKey << "\033[K";
-        
         int r = uiBaseLine + 6;
         for (const auto& row : s.rows) {
-            moveTo(r++, 1);
-            std::cout << std::left << std::setw(10) << row.type << std::setw(26) << row.path << std::setw(45) << row.addr;
-            if (row.isHit) std::cout << "\033[1;32mHIT\033[0m"; else std::cout << "-";
+            moveTo(r++, 1); std::cout << std::left << std::setw(10) << row.type << std::setw(26) << row.path << std::setw(45) << row.addr;
+            if (row.isHit) std::cout << "\033[1;32m" << row.status << "\033[0m"; else std::cout << "-";
             std::cout << "\033[K";
         }
-        
-        std::string speedLabel = cfg.showRealSpeed ? "Real Speed: " : "Speed: ";
-        moveTo(r + 1, 1);
-        std::cout << "Total: " << formatUnits((double)totalAddressesChecked.load(), "addr") 
-                  << " | " << speedLabel << "\033[1;32m" << formatUnits((double)totalAddressesChecked.load() / secs, "addr/s") << "\033[0m\033[K" << std::flush;
+        moveTo(r + 1, 1); std::cout << "Total: " << formatUnits((double)totalAddressesChecked.load(), "addr") << " | Speed: " << formatUnits((double)totalAddressesChecked.load() / secs, "addr/s") << "\033[K" << std::flush;
     }
 
     void workerClassBGPU(int gpuIdx) {
         ActiveGpuContext& gpu = activeGpus[gpuIdx];
         if (gpu.backend == "CUDA") cudaSetDevice(gpu.deviceId);
-        unsigned long long batchSize = gpu.provider->getBatchSize();
-        unsigned long long* foundSeeds = new unsigned long long[1024];
-        int foundCount = 0;
-        std::mt19937_64 rng(std::random_device{}() + gpuIdx);
-        size_t bitRotationIdx = 0;
-        int phraseLen = (!cfg.akmLengths.empty()) ? cfg.akmLengths[0] : 10;
-
-        auto lastUiUpdate = std::chrono::high_resolution_clock::now();
+        unsigned long long bSz = gpu.provider->getBatchSize();
+        unsigned long long* fSeeds = new unsigned long long[1024]; int fCnt = 0;
+        std::mt19937_64 rng(std::random_device{}() + gpuIdx); size_t bRotIdx = 0;
+        int pLen = (!cfg.akmLengths.empty()) ? cfg.akmLengths[0] : 10;
+        auto lastUi = std::chrono::high_resolution_clock::now();
 
         while (running) {
-            unsigned long long currentTaskSize = batchSize;
             unsigned long long base;
-            int bit = (cfg.runMode == "akm" && !cfg.akmBits.empty()) ? cfg.akmBits[bitRotationIdx++ % cfg.akmBits.size()] : 0;
-
-            if (!cfg.infinite && cfg.count > 0) {
-                base = totalSeedsChecked.fetch_add(batchSize);
-                if (base >= (unsigned long long)cfg.count) { running = false; break; }
-                if (base + batchSize > (unsigned long long)cfg.count) currentTaskSize = (unsigned long long)cfg.count - base;
-            } else {
-                base = (cfg.mnemonicOrder == "random") ? rng() : totalSeedsChecked.fetch_add(batchSize);
-            }
+            int bit = (cfg.runMode == "akm" && !cfg.akmBits.empty()) ? cfg.akmBits[bRotIdx++ % cfg.akmBits.size()] : 0;
+            base = (cfg.mnemonicOrder == "random") ? rng() : totalSeedsChecked.fetch_add(bSz);
 
             if (bloom.isLoaded() && gpu.backend == "CUDA") {
-                if (cfg.runMode == "akm") launch_gpu_akm_search(base, currentTaskSize, cfg.cudaBlocks, cfg.cudaThreads, bloom.getRawData(), bloom.getSize(), foundSeeds, &foundCount, bit);
-                else launch_gpu_mnemonic_search(base, currentTaskSize, cfg.cudaBlocks, cfg.cudaThreads, bloom.getRawData(), bloom.getSize(), foundSeeds, &foundCount);
+                if (cfg.runMode == "akm") launch_gpu_akm_search(base, bSz, cfg.cudaBlocks, cfg.cudaThreads, bloom.getRawData(), bloom.getSize(), fSeeds, &fCnt, bit);
+                else launch_gpu_mnemonic_search(base, bSz, cfg.cudaBlocks, cfg.cudaThreads, bloom.getRawData(), bloom.getSize(), fSeeds, &fCnt);
             }
 
-            if (foundCount > 0) {
-                for (int i = 0; i < foundCount; i++) {
-                    if (cfg.runMode == "akm") {
-                         AkmResult res = akmTool.processAkmSeed(foundSeeds[i], cfg.mnemonicOrder, bit, phraseLen, bloom);
-                         for (auto& r : res.rows) if (r.isHit) logDetailedHit("HIT AKM", std::to_string(foundSeeds[i]), res.phrase, r.addr, res.hexKey, r.path);
-                    } else {
-                         MnemonicResult res = mnemonicTool.processSeed(foundSeeds[i], cfg.mnemonicOrder, cfg.words, bloom);
-                         for (auto& r : res.rows) if (r.isHit) logDetailedHit("HIT MNEM", std::to_string(foundSeeds[i]), res.mnemonic, r.addr, "-", r.path);
+            if (fCnt > 0) {
+                for (int i = 0; i < fCnt; i++) {
+                    AkmResult res = akmTool.processAkmSeed(fSeeds[i], cfg.mnemonicOrder, bit, pLen, bloom);
+                    for (auto& r : res.rows) if (r.isHit) logDetailedHit("GPU_HIT", std::to_string(fSeeds[i]), res.phrase, r.addr, res.hexKey, r.path);
+                }
+                fCnt = 0;
+            }
+
+            if (gpuIdx == 0 && std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - lastUi).count() > 1000) {
+                lastUi = std::chrono::high_resolution_clock::now();
+                AkmResult res = akmTool.processAkmSeed(base, cfg.mnemonicOrder, bit, pLen, bloom);
+                std::vector<DisplayState::AddrInfo> fRows;
+                for(auto& r : res.rows) {
+                    if (isAddressTypeMatch(r.type, r.path, cfg.setAddress)) {
+                        fRows.push_back({r.type, r.path, r.addr, r.status, r.isHit});
+                        if (r.isHit) logDetailedHit("UI_HIT", std::to_string(base), res.phrase, r.addr, res.hexKey, r.path);
                     }
                 }
-                foundCount = 0;
+                { std::lock_guard<std::mutex> lock(displayMutex); currentDisplay.countId = base; currentDisplay.currentBit = bit; currentDisplay.mnemonic = res.phrase; currentDisplay.hexKey = res.hexKey; currentDisplay.rows = fRows; }
             }
-
-            auto now = std::chrono::high_resolution_clock::now();
-            if (gpuIdx == 0 && std::chrono::duration_cast<std::chrono::milliseconds>(now - lastUiUpdate).count() > 1000) {
-                lastUiUpdate = now;
-                std::vector<DisplayState::AddrInfo> fRows;
-                if (cfg.runMode == "akm") {
-                    AkmResult res = akmTool.processAkmSeed(base, cfg.mnemonicOrder, bit, phraseLen, bloom);
-                    for(auto& row : res.rows) if (isAddressTypeMatch(row.type, row.path, cfg.setAddress)) fRows.push_back({row.type, row.path, row.addr, row.isHit});
-                    { std::lock_guard<std::mutex> lock(displayMutex); currentDisplay.countId = base; currentDisplay.currentBit = bit; currentDisplay.mnemonic = res.phrase; currentDisplay.hexKey = res.hexKey; currentDisplay.rows = fRows; }
-                } else {
-                    MnemonicResult res = mnemonicTool.processSeed(base, cfg.mnemonicOrder, cfg.words, bloom);
-                    for(auto& row : res.rows) if (isAddressTypeMatch(row.type, row.path, cfg.setAddress)) fRows.push_back({row.type, row.path, row.addr, row.isHit});
-                    { std::lock_guard<std::mutex> lock(displayMutex); currentDisplay.countId = base; currentDisplay.mnemonic = res.mnemonic; currentDisplay.hexKey = "BIP39"; currentDisplay.rows = fRows; }
-                }
-            }
-
-            unsigned long long increment = cfg.showRealSpeed ? currentTaskSize : (currentTaskSize * 4);
-            totalAddressesChecked.fetch_add(increment);
+            totalAddressesChecked.fetch_add(cfg.showRealSpeed ? bSz : bSz * 4);
         }
-        delete[] foundSeeds;
+        delete[] fSeeds;
+    }
+
+    void workerLegacyHybrid(int gpuIdx) {
+        ActiveGpuContext& gpu = activeGpus[gpuIdx];
+        unsigned char* buffer = hostBuffers[gpuIdx]; int bSz = gpu.provider->getBatchSize();
+        std::vector<Scheme> schemes = {{"LEGACY", "m/0/0", 0}, {"SEGWIT", "m/84'/0'/0'/0/0", 2}};
+        while(running) {
+            unsigned long long base = totalSeedsChecked.fetch_add(bSz);
+            gpu.provider->generate(buffer, base, 32);
+            #pragma omp parallel num_threads(workerCores)
+            {
+                secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY);
+                #pragma omp for schedule(guided)
+                for (int i = 0; i < bSz; ++i) {
+                    std::vector<uint8_t> priv(buffer + (i * 32), buffer + (i * 32) + 32);
+                    for (const auto& s : schemes) {
+                        secp256k1_pubkey pub; if (!secp256k1_ec_pubkey_create(ctx, &pub, priv.data())) continue;
+                        uint8_t cPub[33]; size_t len = 33; secp256k1_ec_pubkey_serialize(ctx, cPub, &len, &pub, SECP256K1_EC_COMPRESSED);
+                        std::vector<uint8_t> vPub(cPub, cPub + 33), payload; Hash160(vPub, payload);
+                        if (bloom.isLoaded() && bloom.check_hash160(payload)) logDetailedHit("HYBRID", "HIT", "-", PubKeyToNativeSegwit(vPub), toHex(priv), s.path);
+                    }
+                }
+                secp256k1_context_destroy(ctx);
+            }
+            totalAddressesChecked.fetch_add(bSz * schemes.size());
+        }
     }
 
     void start() {
-        drawInterface(); startTime = std::chrono::high_resolution_clock::now();
+        startTime = std::chrono::high_resolution_clock::now(); drawInterface();
         std::vector<std::thread> threads;
-        for (int i = 0; i < (int)activeGpus.size(); i++) threads.emplace_back(&Runner::workerClassBGPU, this, i);
+        for (int i = 0; i < (int)activeGpus.size(); i++) {
+            if (activeGpus[i].backend == "CUDA" && bloom.isLoaded() && !isInputMode) threads.emplace_back(&Runner::workerClassBGPU, this, i);
+            else threads.emplace_back(&Runner::workerLegacyHybrid, this, i);
+        }
         while (running) { std::this_thread::sleep_for(std::chrono::milliseconds(200)); updateStats(); }
         for (auto& th : threads) if (th.joinable()) th.join();
-        updateStats(); restoreConsole();
+        restoreConsole();
     }
 };
