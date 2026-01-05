@@ -1,5 +1,5 @@
 
-# 🚀 GpuCracker v32.0 (FINAL)
+# 🚀 GpuCracker 
 
 **GpuCracker** is a high-performance, modular cryptocurrency seed and private key recovery tool. It leverages massive hardware acceleration via **CUDA**, **OpenCL**, and **Vulkan** to perform billions of cryptographic checks per second against target address databases using optimized Bloom Filters.
 
