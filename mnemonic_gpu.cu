@@ -1,6 +1,7 @@
 /**
- * mnemonic_gpu.cu - REPAIRED VERSION v34.0
- * Fixed: Host/Device calls, rol identifier, UTF-8 tokens, and missing arguments.
+ * mnemonic_gpu.cu - FIXED VERSION v39.0 (Global Memory Fix)
+ * Fixed: Moved large wordlist from __constant__ (64KB limit) to Global Memory.
+ * This resolves the "File uses too much global constant data" error.
  */
 
 #include "mnemonic.h"
@@ -12,14 +13,22 @@
 #include <string.h>
 
 #define PBKDF2_ITERATIONS 2048
-#define MAX_WORDLIST_SIZE 2048
-#define MAX_WORD_LENGTH 9
+// Putem avea oricate cuvinte acum, nu suntem limitati de __constant__
+#define MAX_WORDLIST_SIZE 8192 
+#define MAX_WORD_LENGTH 32     
 #define BLOOM_K 30
 
-// --- MEMORIE CONSTANTA ---
-__constant__ char c_wordlist[MAX_WORDLIST_SIZE][MAX_WORD_LENGTH];
-__constant__ uint8_t c_wordlist_len[MAX_WORDLIST_SIZE];
+// --- MEMORIE GLOBALA (POINTERI) ---
+// Nu mai folosim __constant__ pentru array-ul mare, ci pointeri catre VRAM
+static char* d_global_wordlist = nullptr;
+static uint8_t* d_global_wordlist_len = nullptr;
+__constant__ int c_word_count; // Ramane in constant (e mic, 4 bytes)
 
+// Buffere GPU pentru rezultate
+static unsigned long long* d_foundSeeds = nullptr;
+static int* d_foundCount = nullptr;
+
+// --- TABELE CONSTANTE (Raman aici, sunt mici) ---
 __constant__ uint32_t K256[64] = {
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
     0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
@@ -57,9 +66,6 @@ __constant__ uint64_t K512[80] = {
 __constant__ uint32_t _GX[8] = { 0x16F81798, 0x59F2815B, 0x2DCE28D9, 0x029BFCDB, 0xCE870B07, 0x55A06295, 0xF9DCBBAC, 0x79BE667E };
 __constant__ uint32_t _GY[8] = { 0xFB10D4B8, 0x9C47D08F, 0xA6855419, 0xFD17B448, 0x0E1108A8, 0x5DA4FBFC, 0x26A3C465, 0x483ADA77 };
 __constant__ uint32_t _P[8] = { 0xFFFFFF2F, 0xFFFFFFFE, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };
-
-__device__ volatile int g_found_flag = 0;
-__device__ char g_found_mnemonic[256];
 
 typedef struct { uint32_t v[8]; } u256;
 typedef struct { u256 x, y, z; } Point;
@@ -254,7 +260,7 @@ static __device__ inline uint32_t frip(uint32_t x, uint32_t y, uint32_t z, int r
 static __device__ void ripemd160_transform(uint32_t* state, const uint32_t* block) {
     uint32_t a = state[0], b = state[1], c = state[2], d = state[3], e = state[4];
     uint32_t aa = a, bb = b, cc = c, dd = d, ee = e;
-    for (int i = 0; i < 16; i++) { uint32_t t = a + frip(b, c, d, i) + block[i]; a = rol(t, 10) + e; c = rol(c, 10); /* simplified logic for space */ }
+    for (int i = 0; i < 16; i++) { uint32_t t = a + frip(b, c, d, i) + block[i]; a = rol(t, 10) + e; c = rol(c, 10); }
     state[0] += a; state[1] += b; state[2] += c; state[3] += d; state[4] += e;
 }
 static __device__ void ripemd160_final(uint32_t* state, const uint8_t* data, int len) {
@@ -281,36 +287,117 @@ static __device__ bool check_bloom_gpu(const uint8_t* h160, uint8_t* bloom, uint
     return true;
 }
 
-__global__ void gpu_mnemonic_crack(int batch, unsigned long long seed, uint8_t* bloom, uint64_t bloom_bits) {
+// --- KERNEL PRINCIPAL (MODIFICAT: Pointers la memorie globala) ---
+__global__ void gpu_mnemonic_crack(int batch, unsigned long long base_seed, const char* __restrict__ wordlist, const uint8_t* __restrict__ wordlist_len, uint8_t* bloom, uint64_t bloom_bits, unsigned long long* foundSeeds, int* foundCnt) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x; if (tid >= batch) return;
-    curandState st; curand_init(seed + tid, 0, 0, &st);
+    
+    curandState st; curand_init(base_seed + tid, 0, 0, &st);
     char mnemo[256]; int mlen = 0;
-    for (int w = 0; w < 12; w++) { int idx = curand(&st) % 2048; int wl = c_wordlist_len[idx]; for (int k = 0; k < wl; k++) mnemo[mlen++] = c_wordlist[idx][k]; if (w < 11) mnemo[mlen++] = ' '; }
+    
+    // NOU: Accesare lista prin pointeri in Global Memory
+    for (int w = 0; w < 12; w++) { 
+        int idx = curand(&st) % c_word_count; 
+        int wl = wordlist_len[idx]; 
+        // Accesare flatten: wordlist[idx * MAX_WORD_LENGTH + k]
+        for (int k = 0; k < wl; k++) mnemo[mlen++] = wordlist[idx * MAX_WORD_LENGTH + k]; 
+        if (w < 11) mnemo[mlen++] = ' '; 
+    }
     mnemo[mlen] = 0;
+    
     uint8_t b_seed[64], m_key[64], pk[33], sha[32], h160[20];
     pbkdf2(mnemo, mlen, "mnemonic", 8, PBKDF2_ITERATIONS, b_seed);
     hmac_sha512((uint8_t*)"Bitcoin seed", 12, b_seed, 64, m_key);
     secp256k1_mul_G(m_key, pk); sha256(pk, 33, sha);
+    
     uint32_t ripeSt[5] = { 0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0 };
     ripemd160_final(ripeSt, sha, 32);
     for (int i = 0; i < 5; i++) { h160[i * 4] = ripeSt[i] & 0xFF; h160[i * 4 + 1] = (ripeSt[i] >> 8) & 0xFF; h160[i * 4 + 2] = (ripeSt[i] >> 16) & 0xFF; h160[i * 4 + 3] = (ripeSt[i] >> 24) & 0xFF; }
-    if (check_bloom_gpu(h160, bloom, bloom_bits)) g_found_flag = 1;
+    
+    if (check_bloom_gpu(h160, bloom, bloom_bits)) {
+         int idx = atomicAdd(foundCnt, 1);
+         if (idx < 1024) foundSeeds[idx] = base_seed + tid;
+    }
 }
 
 // --- HOST API ---
-extern "C" void launch_gpu_init(const char* host_wordlist_raw, int length) {
-    char temp_wl[2048][9]; uint8_t temp_len[2048]; memset(temp_wl, 0, sizeof(temp_wl)); memset(temp_len, 0, sizeof(temp_len));
+extern "C" void launch_gpu_init(const char* host_wordlist_raw, int length, int wordCount) {
+    // 1. Pregatim bufferul flat pe host
+    size_t total_size = (size_t)wordCount * MAX_WORD_LENGTH;
+    char* temp_wl = new char[total_size];
+    uint8_t* temp_len = new uint8_t[wordCount];
+    
+    memset(temp_wl, 0, total_size); 
+    memset(temp_len, 0, wordCount);
+    
     int wordIdx = 0, charIdx = 0;
-    for (int i = 0; i < length && wordIdx < 2048; i++) {
+    
+    for (int i = 0; i < length && wordIdx < wordCount; i++) {
         char c = host_wordlist_raw[i];
-        if (c == '\n' || c == '\r' || c == ' ') { if (charIdx > 0) { temp_len[wordIdx++] = (uint8_t)charIdx; charIdx = 0; } }
-        else if (charIdx < 9) temp_wl[wordIdx][charIdx++] = c;
+        if (c == '\n' || c == '\r' || c == ' ') { 
+            if (charIdx > 0) { 
+                temp_len[wordIdx++] = (uint8_t)charIdx; 
+                charIdx = 0; 
+            } 
+        }
+        else if (charIdx < MAX_WORD_LENGTH) {
+            // Accesare flatten: idx * 32 + k
+            temp_wl[wordIdx * MAX_WORD_LENGTH + charIdx++] = c;
+        }
     }
-    cudaMemcpyToSymbol(c_wordlist, temp_wl, sizeof(temp_wl));
-    cudaMemcpyToSymbol(c_wordlist_len, temp_len, sizeof(temp_len));
+    
+    if (charIdx > 0 && wordIdx < wordCount) {
+        temp_len[wordIdx++] = (uint8_t)charIdx;
+    }
+
+    // 2. Alocam memorie GLOBALA pe GPU (nu __constant__)
+    if (d_global_wordlist) cudaFree(d_global_wordlist);
+    if (d_global_wordlist_len) cudaFree(d_global_wordlist_len);
+
+    cudaMalloc(&d_global_wordlist, total_size);
+    cudaMalloc(&d_global_wordlist_len, wordCount);
+
+    // 3. Copiem datele
+    cudaMemcpy(d_global_wordlist, temp_wl, total_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_global_wordlist_len, temp_len, wordCount, cudaMemcpyHostToDevice);
+    
+    // 4. Setam constanta mica (word count)
+    int actualCount = (wordCount > 0) ? wordCount : wordIdx;
+    cudaMemcpyToSymbol(c_word_count, &actualCount, sizeof(int));
+    
+    printf("[GPU] Initialized GLOBAL memory with dictionary size: %d words\n", actualCount);
+
+    delete[] temp_wl;
+    delete[] temp_len;
 }
 
 extern "C" void launch_gpu_mnemonic_search(unsigned long long s, unsigned long long c, int b, int t, const void* bf, size_t bs, unsigned long long* os, int* oc) {
-    gpu_mnemonic_crack<<<b, t>>>((int)c, s, (uint8_t*)bf, (uint64_t)bs * 8);
+    if (d_foundSeeds == nullptr) {
+        cudaMalloc(&d_foundSeeds, 1024 * sizeof(unsigned long long));
+        cudaMalloc(&d_foundCount, sizeof(int));
+    }
+    
+    static uint8_t* d_bloomData_local = nullptr;
+    static size_t d_bloomSize_local = 0;
+    
+    if (d_bloomData_local == nullptr || d_bloomSize_local != bs) {
+        if (d_bloomData_local) cudaFree(d_bloomData_local);
+        cudaMalloc(&d_bloomData_local, bs);
+        cudaMemcpy(d_bloomData_local, bf, bs, cudaMemcpyHostToDevice);
+        d_bloomSize_local = bs;
+    }
+
+    cudaMemset(d_foundCount, 0, sizeof(int));
+
+    // NOU: Trimitem pointerii globali catre kernel
+    gpu_mnemonic_crack<<<b, t>>>((int)c, s, d_global_wordlist, d_global_wordlist_len, d_bloomData_local, (uint64_t)bs * 8, d_foundSeeds, d_foundCount);
     cudaDeviceSynchronize();
+
+    int count = 0;
+    cudaMemcpy(&count, d_foundCount, sizeof(int), cudaMemcpyDeviceToHost);
+    
+    if (count > 0) {
+        if (count > 1024) count = 1024;
+        cudaMemcpy(os, d_foundSeeds, count * sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+    }
+    *oc = count;
 }

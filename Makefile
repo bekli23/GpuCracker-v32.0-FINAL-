@@ -1,60 +1,83 @@
 # ============================================================================
-# GpuCracker v32.0 (FINAL) - Makefile for Linux (Ubuntu 22.04)
+# GpuCracker v40.0 - Makefile (Linux - Robust)
+# Fix: Eliminare duplicate obiecte (sort) și multiple main
 # ============================================================================
 
-# --- CONFIGURARE COMPILATOARE ---
-NVCC = nvcc
-CXX  = g++
+# --- CĂI CUDA ---
+CUDA_PATH ?= /usr/local/cuda
 
-# --- ARHITECTURI GPU (UNIVERSAL COMPATIBILITY) ---
-# Include suport complet de la Maxwell (sm_50) până la Hopper (sm_90)
-ARCH_FLAGS = -gencode arch=compute_50,code=sm_50 \
-             -gencode arch=compute_52,code=sm_52 \
-             -gencode arch=compute_60,code=sm_60 \
-             -gencode arch=compute_61,code=sm_61 \
-             -gencode arch=compute_70,code=sm_70 \
-             -gencode arch=compute_75,code=sm_75 \
-             -gencode arch=compute_80,code=sm_80 \
-             -gencode arch=compute_86,code=sm_86 \
-             -gencode arch=compute_87,code=sm_87 \
-             -gencode arch=compute_89,code=sm_89 \
-             -gencode arch=compute_90,code=sm_90
+# --- COMPILATOARE ---
+CXX  := g++
+NVCC := $(CUDA_PATH)/bin/nvcc
 
-# --- FLAGURI DE COMPILARE ---
-# -O3: Optimizare maximă pentru viteză
-# -std=c++17: Standardul de limbaj necesar
-# -Xcompiler -fopenmp: Activează suportul multi-core CPU (OpenMP)
-# -w: Ignoră warning-urile pentru o compilare mai curată
-CFLAGS   = -O3 -std=c++17 -Xcompiler -fopenmp -w
-LDFLAGS  = -lOpenCL -lcrypto -lssl -lsecp256k1 -lcurand
+# --- FLAGURI ---
+INCLUDES = -I. -I$(CUDA_PATH)/include
+# -fpermissive ajută la compatibilitatea cu cod C++ mai vechi/permisiv
+CXXFLAGS = -O3 -std=c++17 -fopenmp -pthread -w -fpermissive $(INCLUDES)
 
-# --- SURSE ȘI OBIECTE ---
-# Include mnemonic_gpu.cu pentru suportul BIP39 complet pe GPU
-SOURCES  = main.cu kernel_ops.cu GpuCore.cu cuda_provider.cu mnemonic_gpu.cu
-OBJECTS  = $(SOURCES:.cu=.o)
+# Arhitecturi GPU: sm_86 (RTX 30xx), sm_89 (RTX 40xx)
+NVCCFLAGS = -O3 -std=c++17 -Xcompiler -fopenmp -w $(INCLUDES) \
+            -gencode arch=compute_86,code=sm_86 \
+            -gencode arch=compute_89,code=sm_89
 
-# --- TARGETURI FINALE ---
-TARGET      = GpuCracker
-BUILD_BLOOM = build_bloom
+# --- LIBRĂRII ---
+LDFLAGS = -L$(CUDA_PATH)/lib64 -lcudart -lOpenCL -lcrypto -lssl -lsecp256k1 -lcurand -pthread -fopenmp
 
-# --- REGULI DE CONSTRUCȚIE ---
+# --- DEFINIRE ȚINTE (TARGETS) ---
+TARGET_APP      = GpuCracker
+TARGET_BLOOM    = build_bloom
+TARGET_RECOVER  = recover_tool
+TARGET_SEED2PRIV= seed2priv_tool
 
-all: $(TARGET) $(BUILD_BLOOM)
+# --- SURSE AUTOMATE ---
+SRCS_CPP = $(wildcard *.cpp)
+SRCS_CU  = $(wildcard *.cu)
 
-# Compilarea executabilului principal GpuCracker
-$(TARGET): $(OBJECTS)
-	$(NVCC) $(ARCH_FLAGS) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+# --- FILTRARE SURSE PENTRU GPUCRACKER ---
+# Excludem fișierele care au propriul main()
+EXCLUDE_LIST = build_bloom.cpp recover.cpp seed2priv_main.cpp
+SRCS_APP_CPP = $(filter-out $(EXCLUDE_LIST), $(SRCS_CPP))
 
-# Compilarea utilitarului pentru filtre Bloom
-$(BUILD_BLOOM): build_bloom.cpp
-	$(CXX) -O3 build_bloom.cpp -o $@ -lssl -lcrypto
+# Obiecte pentru GpuCracker
+# FIX: Folosim $(sort ...) pentru a elimina duplicatele (ex: main.o)
+OBJS_APP = $(sort $(SRCS_APP_CPP:.cpp=.o) $(SRCS_CU:.cu=.o))
 
-# Regula pentru transformarea fișierelor .cu în obiecte .o
+# --- REGULI ---
+
+all: $(TARGET_APP) $(TARGET_BLOOM) $(TARGET_RECOVER) $(TARGET_SEED2PRIV)
+
+# 1. GpuCracker (Main App)
+$(TARGET_APP): $(OBJS_APP)
+	@echo "[LINK] $@"
+	$(CXX) $(OBJS_APP) -o $@ $(LDFLAGS)
+
+# 2. Build Bloom Tool
+$(TARGET_BLOOM): build_bloom.o
+	@echo "[LINK] $@"
+	$(CXX) build_bloom.o -o $@ $(LDFLAGS)
+
+# 3. Recover Tool
+$(TARGET_RECOVER): recover.o
+	@echo "[LINK] $@"
+	$(CXX) recover.o -o $@ $(LDFLAGS)
+
+# 4. Seed2Priv Tool
+$(TARGET_SEED2PRIV): seed2priv_main.o
+	@echo "[LINK] $@"
+	$(CXX) seed2priv_main.o -o $@ $(LDFLAGS)
+
+# --- REGULI GENERALE DE COMPILARE ---
+
+%.o: %.cpp
+	@echo "[CXX]  $<"
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
 %.o: %.cu
-	$(NVCC) $(ARCH_FLAGS) $(CFLAGS) -c $< -o $@
+	@echo "[NVCC] $<"
+	$(NVCC) $(NVCCFLAGS) -c $< -o $@
 
-# Curățarea fișierelor temporare și a executabilelor
+# --- CURĂȚARE ---
 clean:
-	rm -f *.o $(TARGET) $(BUILD_BLOOM)
+	rm -f *.o $(TARGET_APP) $(TARGET_BLOOM) $(TARGET_RECOVER) $(TARGET_SEED2PRIV)
 
 .PHONY: all clean
