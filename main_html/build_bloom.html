@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bloom Filter Builder - Optimized Address Filter Creation</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/tool.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <canvas id="matrixCanvas"></canvas>
+    
+    <nav class="navbar">
+        <div class="nav-brand">
+            <i class="fas fa-key"></i>
+            <span>BTCR tools</span>
+        </div>
+        <ul class="nav-menu">
+            <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="SeedRecover.html"><i class="fas fa-seedling"></i> SeedRecover</a></li>
+            <li><a href="GpuCracker.html"><i class="fas fa-microchip"></i> GpuCracker</a></li>
+            <li><a href="build_bloom.html" class="active"><i class="fas fa-filter"></i> Bloom Filter</a></li>
+            <li><a href="akm_seed2priv.html"><i class="fas fa-lock"></i> AKM Tools</a></li>
+        </ul>
+        <div class="hamburger">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    </nav>
+
+    <main class="tool-page">
+        <div class="tool-header">
+            <div class="tool-icon-large">
+                <i class="fas fa-filter"></i>
+            </div>
+            <h1>Bloom Filter Builder</h1>
+            <p class="tool-subtitle">Create Optimized Bloom Filters for Fast Address Lookup</p>
+        </div>
+
+        <div class="tool-container">
+            <div class="tool-sidebar">
+                <div class="info-card">
+                    <h3><i class="fas fa-info-circle"></i> What is a Bloom Filter?</h3>
+                    <p>A Bloom filter is a space-efficient probabilistic data structure used to test whether an element is a member of a set.</p>
+                    <ul>
+                        <li>Fast O(k) lookups</li>
+                        <li>Constant space</li>
+                        <li>Configurable false positive rate</li>
+                        <li>No false negatives</li>
+                    </ul>
+                </div>
+
+                <div class="info-card">
+                    <h3><i class="fas fa-calculator"></i> Size Calculator</h3>
+                    <div class="calculator">
+                        <div class="form-group" style="padding: 0;">
+                            <label>Expected Items (n)</label>
+                            <input type="number" id="calcItems" class="form-control" value="1000000">
+                        </div>
+                        <div class="form-group" style="padding: 1rem 0 0;">
+                            <label>False Positive Rate (p)</label>
+                            <select id="calcFPR" class="form-control">
+                                <option value="0.1">10% (fast)</option>
+                                <option value="0.01" selected>1% (balanced)</option>
+                                <option value="0.001">0.1% (accurate)</option>
+                                <option value="0.0001">0.01% (precise)</option>
+                            </select>
+                        </div>
+                        <div class="calc-result" style="margin-top: 1rem; padding: 1rem; background: var(--dark); border-radius: 8px;">
+                            <div class="stat-row">
+                                <span>Filter Size</span>
+                                <strong id="calcSize">1.9 MB</strong>
+                            </div>
+                            <div class="stat-row">
+                                <span>Hash Functions</span>
+                                <strong id="calcHashes">7</strong>
+                            </div>
+                            <div class="stat-row">
+                                <span>Bits per Item</span>
+                                <strong id="calcBits">14.4</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <h3><i class="fas fa-lightbulb"></i> Best Practices</h3>
+                    <ul>
+                        <li>Use 1% FPR for most cases</li>
+                        <li>Combine multiple filters for large sets</li>
+                        <li>Keep filters under 2GB for GPU</li>
+                        <li>Use multi-layer for better accuracy</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="tool-main">
+                <!-- Input Section -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <i class="fas fa-file-import"></i>
+                        <h2>Input Addresses</h2>
+                    </div>
+                    
+                    <div class="input-tabs">
+                        <button class="tab-btn active" data-tab="file">
+                            <i class="fas fa-file"></i> File Upload
+                        </button>
+                        <button class="tab-btn" data-tab="text">
+                            <i class="fas fa-keyboard"></i> Text Input
+                        </button>
+                        <button class="tab-btn" data-tab="generate">
+                            <i class="fas fa-magic"></i> Generate
+                        </button>
+                    </div>
+
+                    <div class="tab-content active" id="tab-file">
+                        <div class="form-group">
+                            <label for="addressFile">Upload Address List</label>
+                            <div class="file-drop-zone" id="dropZone">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <p>Drag & drop files here or click to browse</p>
+                                <small>Supports: .txt, .csv, .json (max 500MB)</small>
+                            </div>
+                            <input type="file" id="addressFile" hidden accept=".txt,.csv,.json">
+                        </div>
+                        
+                        <div class="file-list" id="fileList">
+                            <!-- Dynamic file list -->
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="tab-text">
+                        <div class="form-group">
+                            <label for="addressText">Enter Addresses (one per line)</label>
+                            <textarea id="addressText" class="form-control mono" rows="8" 
+                                placeholder="1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa&#10;1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2&#10;..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="tab-generate">
+                        <div class="form-group">
+                            <label>Generate Test Set</label>
+                            <div class="form-row" style="padding: 0;">
+                                <div class="form-group" style="padding: 0;">
+                                    <label>Count</label>
+                                    <input type="number" id="genCount" class="form-control" value="10000" min="100" max="10000000">
+                                </div>
+                                <div class="form-group" style="padding: 0;">
+                                    <label>Type</label>
+                                    <select id="genType" class="form-control">
+                                        <option value="random">Random</option>
+                                        <option value="p2pkh">P2PKH (1...)</option>
+                                        <option value="p2sh">P2SH (3...)</option>
+                                        <option value="bech32">Bech32 (bc1...)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button class="btn btn-secondary" id="generateBtn" style="margin-top: 1rem;">
+                                <i class="fas fa-magic"></i> Generate Addresses
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="input-stats" style="padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.05);">
+                        <div class="stat-row">
+                            <span><i class="fas fa-address-card"></i> Total Addresses</span>
+                            <strong id="totalAddresses">0</strong>
+                        </div>
+                        <div class="stat-row">
+                            <span><i class="fas fa-check-circle"></i> Valid Addresses</span>
+                            <strong id="validAddresses">0</strong>
+                        </div>
+                        <div class="stat-row">
+                            <span><i class="fas fa-exclamation-triangle"></i> Invalid Lines</span>
+                            <strong id="invalidAddresses">0</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configuration -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <i class="fas fa-sliders-h"></i>
+                        <h2>Filter Configuration</h2>
+                    </div>
+                    
+                    <div class="form-row" style="padding-bottom: 0;">
+                        <div class="form-group">
+                            <label for="filterName">Filter Name</label>
+                            <input type="text" id="filterName" class="form-control" 
+                                   placeholder="my_bitcoin_addresses">
+                        </div>
+                        <div class="form-group">
+                            <label for="fprSelect">False Positive Rate</label>
+                            <select id="fprSelect" class="form-control">
+                                <option value="0.1">10% - Fastest</option>
+                                <option value="0.01" selected>1% - Balanced</option>
+                                <option value="0.001">0.1% - Accurate</option>
+                                <option value="0.0001">0.01% - Most Accurate</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="multiLayer" checked>
+                            <span class="checkmark"></span>
+                            Use Multi-Layer Filters (recommended)
+                        </label>
+                    </div>
+
+                    <div class="form-group" id="layerConfig">
+                        <label>Layer Configuration</label>
+                        <div class="layer-inputs">
+                            <div class="layer-row">
+                                <span class="layer-num">1</span>
+                                <input type="text" class="form-control" value="1M addresses" readonly>
+                                <select class="form-control layer-fpr">
+                                    <option value="0.01" selected>1% FPR</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button class="btn btn-secondary" id="addLayer" style="margin-top: 0.5rem;">
+                            <i class="fas fa-plus"></i> Add Layer
+                        </button>
+                    </div>
+
+                    <div class="config-preview" style="padding: 0 1.5rem 1.5rem;">
+                        <h4 style="margin-bottom: 0.75rem; color: var(--primary);">Estimated Output</h4>
+                        <div class="stat-row">
+                            <span>Total Size</span>
+                            <strong id="estSize">~1.9 MB</strong>
+                        </div>
+                        <div class="stat-row">
+                            <span>Number of Filters</span>
+                            <strong id="estFilters">1</strong>
+                        </div>
+                        <div class="stat-row">
+                            <span>Estimated Build Time</span>
+                            <strong id="estTime">~2 seconds</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Build Progress -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <i class="fas fa-hammer"></i>
+                        <h2>Build Filter</h2>
+                    </div>
+                    
+                    <div class="progress-section">
+                        <div class="progress-header">
+                            <span class="progress-label">Building Filter...</span>
+                            <span class="progress-percent" id="buildProgress">0%</span>
+                        </div>
+                        <div class="progress-bar-large">
+                            <div class="progress-fill-large" id="buildBar" style="width: 0%"></div>
+                        </div>
+                        <div class="build-steps">
+                            <div class="build-step active" data-step="1">
+                                <i class="fas fa-circle"></i>
+                                <span>Parse addresses</span>
+                            </div>
+                            <div class="build-step" data-step="2">
+                                <i class="fas fa-circle"></i>
+                                <span>Validate format</span>
+                            </div>
+                            <div class="build-step" data-step="3">
+                                <i class="fas fa-circle"></i>
+                                <span>Build hash table</span>
+                            </div>
+                            <div class="build-step" data-step="4">
+                                <i class="fas fa-circle"></i>
+                                <span>Save to disk</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn btn-primary btn-large" id="buildBtn">
+                            <i class="fas fa-hammer"></i> Build Filter
+                        </button>
+                        <button class="btn btn-secondary" id="previewBtn">
+                            <i class="fas fa-eye"></i> Preview
+                        </button>
+                        <button class="btn btn-secondary" id="resetBtn">
+                            <i class="fas fa-redo"></i> Reset
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Output -->
+                <div class="panel results-panel">
+                    <div class="panel-header">
+                        <i class="fas fa-download"></i>
+                        <h2>Output Files</h2>
+                    </div>
+                    
+                    <div class="output-files">
+                        <div class="output-file-item">
+                            <div class="file-icon">
+                                <i class="fas fa-file-archive"></i>
+                            </div>
+                            <div class="file-info">
+                                <h4>bitcoin_addresses.blf</h4>
+                                <p>1.9 MB • Bloom Filter • Ready</p>
+                            </div>
+                            <div class="file-actions">
+                                <button class="btn btn-sm btn-secondary">
+                                    <i class="fas fa-download"></i>
+                                </button>
+                                <button class="btn btn-sm btn-secondary">
+                                    <i class="fas fa-info-circle"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="export-options" style="padding: 1.5rem; border-top: 1px solid rgba(255,255,255,0.05);">
+                        <h4 style="margin-bottom: 1rem;">Export Options</h4>
+                        <div class="btn-group">
+                            <button class="btn btn-secondary">
+                                <i class="fas fa-file-export"></i> Export .BLF
+                            </button>
+                            <button class="btn btn-secondary">
+                                <i class="fas fa-file-code"></i> Export JSON
+                            </button>
+                            <button class="btn btn-secondary">
+                                <i class="fas fa-file-alt"></i> Export Report
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-brand">
+                <i class="fas fa-key"></i>
+                <span>Bitcoin Recovery Tools</span>
+            </div>
+            <div class="footer-links">
+                <a href="index.html">Home</a>
+                <a href="SeedRecover.html">SeedRecover</a>
+                <a href="GpuCracker.html">GpuCracker</a>
+                <a href="akm_seed2priv.html">AKM Tools</a>
+            </div>
+            <div class="footer-copyright">
+                © 2025 Bitcoin Recovery Suite. Educational purposes only.
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/matrix.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/build_bloom.js"></script>
+</body>
+</html>

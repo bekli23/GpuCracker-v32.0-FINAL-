@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcoin Recovery Tools Suite | Advanced Cryptographic Solutions</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/animations.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Matrix Rain Background -->
+    <canvas id="matrixCanvas"></canvas>
+    
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <i class="fas fa-key"></i>
+            <span>BTCR tools</span>
+        </div>
+        <ul class="nav-menu">
+            <li><a href="index.html" class="active"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="SeedRecover.html"><i class="fas fa-seedling"></i> SeedRecover</a></li>
+            <li><a href="GpuCracker.html"><i class="fas fa-microchip"></i> GpuCracker</a></li>
+            <li><a href="build_bloom.html"><i class="fas fa-filter"></i> Bloom Filter</a></li>
+            <li><a href="akm_seed2priv.html"><i class="fas fa-lock"></i> AKM Tools</a></li>
+        </ul>
+        <div class="hamburger">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="hero">
+        <div class="hero-content">
+            <div class="glitch-wrapper">
+                <h1 class="glitch" data-text="BITCOIN RECOVERY SUITE">BITCOIN RECOVERY SUITE</h1>
+            </div>
+            <p class="hero-subtitle">Advanced Cryptographic Tools for Seed Recovery & Private Key Analysis</p>
+            <p class="hero-description">
+                Professional-grade GPU-accelerated solutions for Bitcoin puzzle solving, 
+                mnemonic recovery, and cryptographic analysis. Supporting 100+ cryptocurrencies 
+                with CUDA, OpenCL, and Vulkan backends.
+            </p>
+            <div class="hero-stats">
+                <div class="stat-item">
+                    <span class="stat-number" data-target="300">0</span>
+                    <span class="stat-label">AKM Profiles</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" data-target="100">0</span>
+                    <span class="stat-label">Coins Supported</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" data-target="916">0</span>
+                    <span class="stat-label">BTC Prize Pool</span>
+                </div>
+            </div>
+            <div class="hero-buttons">
+                <a href="GpuCracker.html" class="btn btn-primary">
+                    <i class="fas fa-rocket"></i> Launch GpuCracker
+                </a>
+                <a href="SeedRecover.html" class="btn btn-secondary">
+                    <i class="fas fa-search"></i> Recover Seed
+                </a>
+            </div>
+        </div>
+        <div class="hero-visual">
+            <div class="cube-container">
+                <div class="cube">
+                    <div class="face front"><i class="fab fa-bitcoin"></i></div>
+                    <div class="face back"><i class="fas fa-key"></i></div>
+                    <div class="face right"><i class="fas fa-lock"></i></div>
+                    <div class="face left"><i class="fas fa-shield-alt"></i></div>
+                    <div class="face top"><i class="fas fa-microchip"></i></div>
+                    <div class="face bottom"><i class="fas fa-database"></i></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Features Grid -->
+    <section class="features">
+        <h2 class="section-title"><span class="gradient-text">Powerful Tools</span></h2>
+        <div class="features-grid">
+            <a href="SeedRecover.html" class="feature-card">
+                <div class="card-icon">
+                    <i class="fas fa-seedling"></i>
+                </div>
+                <h3>SeedRecover</h3>
+                <p>Mnemonic phrase recovery with missing words, word substitution, and pattern matching. Supports BIP39 wordlists in multiple languages.</p>
+                <div class="card-features">
+                    <span class="tag">BIP39</span>
+                    <span class="tag">Multi-language</span>
+                </div>
+            </a>
+
+            <a href="GpuCracker.html" class="feature-card featured">
+                <div class="card-badge">POPULAR</div>
+                <div class="card-icon">
+                    <i class="fas fa-microchip"></i>
+                </div>
+                <h3>GpuCracker</h3>
+                <p>High-performance GPU seed cracker with CUDA, OpenCL, and Vulkan support. 100+ coin support, Bloom filters, and Bitcoin Puzzle solving.</p>
+                <div class="card-features">
+                    <span class="tag">CUDA 12</span>
+                    <span class="tag">OpenCL</span>
+                    <span class="tag">Vulkan</span>
+                </div>
+            </a>
+
+            <a href="build_bloom.html" class="feature-card">
+                <div class="card-icon">
+                    <i class="fas fa-filter"></i>
+                </div>
+                <h3>Bloom Filter Builder</h3>
+                <p>Create optimized Bloom filters from address lists for efficient set membership testing. Multi-layer support with configurable parameters.</p>
+                <div class="card-features">
+                    <span class="tag">Space-efficient</span>
+                    <span class="tag">Fast Lookup</span>
+                </div>
+            </a>
+
+            <a href="akm_seed2priv.html" class="feature-card">
+                <div class="card-icon">
+                    <i class="fas fa-lock"></i>
+                </div>
+                <h3>AKM Seed2Priv</h3>
+                <p>Advanced Key Management with 300+ custom profiles. HKDF-based token generation, checksum validation, and special rules support.</p>
+                <div class="card-features">
+                    <span class="tag">300 Profiles</span>
+                    <span class="tag">HKDF</span>
+                </div>
+            </a>
+        </div>
+    </section>
+
+    <!-- Terminal Demo -->
+    <section class="terminal-section">
+        <h2 class="section-title"><span class="gradient-text">Command Examples</span></h2>
+        <div class="terminal-window">
+            <div class="terminal-header">
+                <div class="terminal-buttons">
+                    <span class="btn-close"></span>
+                    <span class="btn-minimize"></span>
+                    <span class="btn-maximize"></span>
+                </div>
+                <span class="terminal-title">btcr@recovery:~</span>
+            </div>
+            <div class="terminal-body">
+                <div class="command-line">
+                    <span class="prompt">$</span>
+                    <span class="command">GpuCracker.exe --mode puzzle --puzzle 71 --blocks 256 --threads 512</span>
+                </div>
+                <div class="output">
+================================================================================<br>
+           BITCOIN PUZZLE CHALLENGE MODE<br>
+================================================================================<br><br>
+Puzzle #71<br>
+Prize: 7.1 BTC (~$600,000 USD)<br>
+Status: UNSOLVED<br>
+Range: 400000000000000000 - 7fffffffffffffffff<br>
+Address: 1PWo3JeB9jrGwfHDNpdGK54CRas7fsVzXU<br><br>
+GPU Configuration: 256 blocks × 512 threads<br>
+Speed: ~150M keys/second<br>
+Estimated coverage: 0.000001% per day<br>
+================================================================================
+                </div>
+                <div class="command-line">
+                    <span class="prompt">$</span>
+                    <span class="command">SeedRecover.exe --wordlist english.txt --missing 2 --pattern "* abandon * * * ability *"</span>
+                </div>
+                <div class="output">
+[SeedRecover] Loading wordlist: 2048 words<br>
+[SeedRecover] Pattern: * abandon * * * ability *<br>
+[SeedRecover] Missing positions: 2 words<br>
+[SeedRecover] Combinations to test: 4,194,304<br>
+[SeedRecover] Progress: ████████░░ 78.5%<br>
+[SeedRecover] Speed: 450,000 phrases/sec
+                </div>
+                <div class="cursor"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Puzzle Status -->
+    <section class="puzzle-status">
+        <h2 class="section-title"><span class="gradient-text">Bitcoin Puzzle Status</span></h2>
+        <div class="puzzle-grid">
+            <div class="puzzle-card solved">
+                <div class="puzzle-number">#66</div>
+                <div class="puzzle-prize">6.6 BTC</div>
+                <div class="puzzle-status-badge"><i class="fas fa-check-circle"></i> SOLVED</div>
+                <div class="puzzle-date">2024-09-12</div>
+            </div>
+            <div class="puzzle-card solved">
+                <div class="puzzle-number">#67</div>
+                <div class="puzzle-prize">6.7 BTC</div>
+                <div class="puzzle-status-badge"><i class="fas fa-check-circle"></i> SOLVED</div>
+                <div class="puzzle-date">2025-02-21</div>
+            </div>
+            <div class="puzzle-card solved">
+                <div class="puzzle-number">#68</div>
+                <div class="puzzle-prize">6.8 BTC</div>
+                <div class="puzzle-status-badge"><i class="fas fa-check-circle"></i> SOLVED</div>
+                <div class="puzzle-date">2025-04-06</div>
+            </div>
+            <div class="puzzle-card solved">
+                <div class="puzzle-number">#69</div>
+                <div class="puzzle-prize">6.9 BTC</div>
+                <div class="puzzle-status-badge"><i class="fas fa-check-circle"></i> SOLVED</div>
+                <div class="puzzle-date">2025-04-30</div>
+            </div>
+            <div class="puzzle-card unsolved featured-puzzle">
+                <div class="puzzle-glow"></div>
+                <div class="puzzle-number">#71</div>
+                <div class="puzzle-prize">7.1 BTC</div>
+                <div class="puzzle-status-badge"><i class="fas fa-fire"></i> ACTIVE</div>
+                <div class="puzzle-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                    <span class="progress-text">Searching...</span>
+                </div>
+            </div>
+            <div class="puzzle-card unsolved">
+                <div class="puzzle-number">#72</div>
+                <div class="puzzle-prize">7.2 BTC</div>
+                <div class="puzzle-status-badge"><i class="fas fa-search"></i> UNSOLVED</div>
+            </div>
+        </div>
+        <div class="total-prize">
+            <i class="fab fa-bitcoin"></i>
+            <span>Total Prize Pool: <strong>916.5 BTC</strong> (~$78M USD)</span>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-brand">
+                <i class="fas fa-key"></i>
+                <span>Bitcoin Recovery Tools</span>
+            </div>
+            <div class="footer-links">
+                <a href="https://privatekeys.pw/puzzles/bitcoin-puzzle-tx" target="_blank">
+                    <i class="fas fa-external-link-alt"></i> Puzzle Info
+                </a>
+                <a href="https://bitcointalk.org/index.php?topic=1306983.0" target="_blank">
+                    <i class="fas fa-comments"></i> Bitcointalk
+                </a>
+            </div>
+            <div class="footer-copyright">
+                © 2025 Bitcoin Recovery Suite. Educational purposes only.
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/matrix.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

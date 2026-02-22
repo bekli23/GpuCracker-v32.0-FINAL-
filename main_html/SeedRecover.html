@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SeedRecover - BIP39 Mnemonic Recovery Tool</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/tool.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <canvas id="matrixCanvas"></canvas>
+    
+    <nav class="navbar">
+        <div class="nav-brand">
+            <i class="fas fa-key"></i>
+            <span>BTCR tools</span>
+        </div>
+        <ul class="nav-menu">
+            <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="SeedRecover.html" class="active"><i class="fas fa-seedling"></i> SeedRecover</a></li>
+            <li><a href="GpuCracker.html"><i class="fas fa-microchip"></i> GpuCracker</a></li>
+            <li><a href="build_bloom.html"><i class="fas fa-filter"></i> Bloom Filter</a></li>
+            <li><a href="akm_seed2priv.html"><i class="fas fa-lock"></i> AKM Tools</a></li>
+        </ul>
+        <div class="hamburger">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    </nav>
+
+    <main class="tool-page">
+        <div class="tool-header">
+            <div class="tool-icon-large">
+                <i class="fas fa-seedling"></i>
+            </div>
+            <h1>SeedRecover</h1>
+            <p class="tool-subtitle">BIP39 Mnemonic Phrase Recovery & Brute Force Tool</p>
+        </div>
+
+        <div class="tool-container">
+            <div class="tool-sidebar">
+                <div class="info-card">
+                    <h3><i class="fas fa-info-circle"></i> About</h3>
+                    <p>SeedRecover helps you recover lost or incomplete BIP39 mnemonic phrases. It supports:</p>
+                    <ul>
+                        <li>Missing word recovery</li>
+                        <li>Word substitution</li>
+                        <li>Pattern matching</li>
+                        <li>Multiple languages</li>
+                    </ul>
+                </div>
+
+                <div class="info-card">
+                    <h3><i class="fas fa-lightbulb"></i> Example Patterns</h3>
+                    <div class="code-block">
+                        <code>abandon * * * * * * * * * *</code>
+                        <span class="code-desc">First word known</span>
+                    </div>
+                    <div class="code-block">
+                        <code>* abandon ability * * * * * * * *</code>
+                        <span class="code-desc">Words 2-3 known</span>
+                    </div>
+                    <div class="code-block">
+                        <code>* * * * * * art * * * *</code>
+                        <span class="code-desc">Word 7 starts with "art"</span>
+                    </div>
+                </div>
+
+                <div class="info-card stats-card">
+                    <h3><i class="fas fa-chart-bar"></i> Statistics</h3>
+                    <div class="stat-row">
+                        <span>Wordlists</span>
+                        <strong>8 languages</strong>
+                    </div>
+                    <div class="stat-row">
+                        <span>Max Missing</span>
+                        <strong>4 words</strong>
+                    </div>
+                    <div class="stat-row">
+                        <span>Speed</span>
+                        <strong>~450K/s</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tool-main">
+                <div class="panel">
+                    <div class="panel-header">
+                        <i class="fas fa-cogs"></i>
+                        <h2>Configuration</h2>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="wordlist">Wordlist Language</label>
+                        <select id="wordlist" class="form-control">
+                            <option value="english">English (BIP39)</option>
+                            <option value="spanish">Spanish</option>
+                            <option value="french">French</option>
+                            <option value="italian">Italian</option>
+                            <option value="portuguese">Portuguese</option>
+                            <option value="czech">Czech</option>
+                            <option value="japanese">Japanese</option>
+                            <option value="korean">Korean</option>
+                            <option value="chinese_s">Chinese (Simplified)</option>
+                            <option value="chinese_t">Chinese (Traditional)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="phraseLength">Phrase Length</label>
+                        <div class="btn-group">
+                            <button class="btn-toggle active" data-value="12">12 words</button>
+                            <button class="btn-toggle" data-value="15">15 words</button>
+                            <button class="btn-toggle" data-value="18">18 words</button>
+                            <button class="btn-toggle" data-value="21">21 words</button>
+                            <button class="btn-toggle" data-value="24">24 words</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="knownWords">Known Words Pattern</label>
+                        <input type="text" id="knownWords" class="form-control mono" 
+                               placeholder="* abandon * * ability * * * * * *">
+                        <small class="form-hint">Use * for unknown words, space separated</small>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label for="missingCount">Missing Words</label>
+                            <input type="number" id="missingCount" class="form-control" 
+                                   min="1" max="4" value="2">
+                        </div>
+                        <div class="form-group half">
+                            <label for="address">Known Address (optional)</label>
+                            <input type="text" id="address" class="form-control mono" 
+                                   placeholder="1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="validateChecksum">
+                            <span class="checkmark"></span>
+                            Validate BIP39 checksum
+                        </label>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <i class="fas fa-play-circle"></i>
+                        <h2>Recovery Process</h2>
+                    </div>
+                    
+                    <div class="progress-section">
+                        <div class="progress-header">
+                            <span class="progress-label">Progress</span>
+                            <span class="progress-percent" id="progressPercent">0%</span>
+                        </div>
+                        <div class="progress-bar-large">
+                            <div class="progress-fill-large" id="progressBar" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-stats">
+                            <div class="progress-stat">
+                                <i class="fas fa-clock"></i>
+                                <span id="elapsedTime">00:00:00</span>
+                            </div>
+                            <div class="progress-stat">
+                                <i class="fas fa-tachometer-alt"></i>
+                                <span id="speed">0 phrases/sec</span>
+                            </div>
+                            <div class="progress-stat">
+                                <i class="fas fa-calculator"></i>
+                                <span id="combinations">0 / 4,194,304</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn btn-primary btn-large" id="startBtn">
+                            <i class="fas fa-play"></i> Start Recovery
+                        </button>
+                        <button class="btn btn-secondary btn-large" id="stopBtn" disabled>
+                            <i class="fas fa-stop"></i> Stop
+                        </button>
+                        <button class="btn btn-secondary" id="exportBtn">
+                            <i class="fas fa-download"></i> Export
+                        </button>
+                    </div>
+                </div>
+
+                <div class="panel results-panel">
+                    <div class="panel-header">
+                        <i class="fas fa-search"></i>
+                        <h2>Results <span class="badge" id="resultCount">0</span></h2>
+                    </div>
+                    
+                    <div class="results-table-container">
+                        <table class="results-table" id="resultsTable">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Mnemonic Phrase</th>
+                                    <th>Address</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="empty-row">
+                                    <td colspan="5" class="empty-message">
+                                        <i class="fas fa-inbox"></i>
+                                        <p>No results yet. Start the recovery process.</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-brand">
+                <i class="fas fa-key"></i>
+                <span>Bitcoin Recovery Tools</span>
+            </div>
+            <div class="footer-links">
+                <a href="index.html">Home</a>
+                <a href="GpuCracker.html">GpuCracker</a>
+                <a href="build_bloom.html">Bloom Filter</a>
+                <a href="akm_seed2priv.html">AKM Tools</a>
+            </div>
+            <div class="footer-copyright">
+                © 2025 Bitcoin Recovery Suite. Educational purposes only.
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/matrix.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/seedrecover.js"></script>
+</body>
+</html>

@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AKM Tools - Advanced Key Management</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/tool.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <canvas id="matrixCanvas"></canvas>
+    
+    <nav class="navbar">
+        <div class="nav-brand">
+            <i class="fas fa-key"></i>
+            <span>BTCR tools</span>
+        </div>
+        <ul class="nav-menu">
+            <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="SeedRecover.html"><i class="fas fa-seedling"></i> SeedRecover</a></li>
+            <li><a href="GpuCracker.html"><i class="fas fa-microchip"></i> GpuCracker</a></li>
+            <li><a href="build_bloom.html"><i class="fas fa-filter"></i> Bloom Filter</a></li>
+            <li><a href="akm_seed2priv.html" class="active"><i class="fas fa-lock"></i> AKM Tools</a></li>
+        </ul>
+        <div class="hamburger">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    </nav>
+
+    <main class="tool-page">
+        <div class="tool-header">
+            <div class="tool-icon-large">
+                <i class="fas fa-lock"></i>
+            </div>
+            <h1>AKM Tools</h1>
+            <p class="tool-subtitle">Advanced Key Management with 300+ Custom Profiles</p>
+        </div>
+
+        <div class="tool-container">
+            <div class="tool-sidebar">
+                <div class="info-card">
+                    <h3><i class="fas fa-info-circle"></i> What is AKM?</h3>
+                    <p>Advanced Key Management (AKM) is a custom mnemonic generation system with:</p>
+                    <ul>
+                        <li>512-word custom wordlist</li>
+                        <li>HKDF-based token generation</li>
+                        <li>300+ generation profiles</li>
+                        <li>Checksum validation</li>
+                        <li>Special encoding rules</li>
+                    </ul>
+                </div>
+
+                <div class="info-card">
+                    <h3><i class="fas fa-shield-alt"></i> Security Features</h3>
+                    <ul>
+                        <li>Weak key detection</li>
+                        <li>Domain separation</li>
+                        <li>Integrity hashes</li>
+                        <li>HKDF-SHA256</li>
+                    </ul>
+                </div>
+
+                <div class="info-card">
+                    <h3><i class="fas fa-layer-group"></i> Profile Categories</h3>
+                    <div class="profile-categories">
+                        <div class="cat-item">
+                            <span class="cat-color" style="background: #f7931a;"></span>
+                            <span>Binary (10)</span>
+                        </div>
+                        <div class="cat-item">
+                            <span class="cat-color" style="background: #00d4ff;"></span>
+                            <span>Time (10)</span>
+                        </div>
+                        <div class="cat-item">
+                            <span class="cat-color" style="background: #ff006e;"></span>
+                            <span>Space (10)</span>
+                        </div>
+                        <div class="cat-item">
+                            <span class="cat-color" style="background: #8338ec;"></span>
+                            <span>Music (10)</span>
+                        </div>
+                        <div class="cat-item">
+                            <span class="cat-color" style="background: #00ff88;"></span>
+                            <span>Science (10)</span>
+                        </div>
+                        <div class="cat-item">
+                            <span class="cat-color" style="background: #ffbe0b;"></span>
+                            <span>+20 more...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tool-main">
+                <!-- Profile Explorer -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <i class="fas fa-layer-group"></i>
+                        <h2>Profile Explorer <span class="badge">300</span></h2>
+                    </div>
+                    
+                    <div class="profile-filter">
+                        <div class="form-group" style="padding-bottom: 0;">
+                            <input type="text" class="form-control" id="profileSearch" 
+                                   placeholder="Search profiles...">
+                        </div>
+                        <div class="filter-tags">
+                            <button class="filter-tag active">All</button>
+                            <button class="filter-tag">Basic</button>
+                            <button class="filter-tag">Hex</button>
+                            <button class="filter-tag">Themed</button>
+                            <button class="filter-tag">Advanced</button>
+                        </div>
+                    </div>
+
+                    <div class="profiles-grid">
+                        <div class="profile-card active">
+                            <div class="profile-num">001</div>
+                            <h4>Basic 16</h4>
+                            <p>4-bit hex encoding</p>
+                            <div class="profile-meta">
+                                <span class="tag">STRICT_HEX</span>
+                                <span class="word-count">16 words</span>
+                            </div>
+                        </div>
+                        
+                        <div class="profile-card">
+                            <div class="profile-num">031</div>
+                            <h4>Colors</h4>
+                            <p>Color themed hex</p>
+                            <div class="profile-meta">
+                                <span class="tag">Colors</span>
+                                <span class="word-count">16 words</span>
+                            </div>
+                        </div>
+                        
+                        <div class="profile-card">
+                            <div class="profile-num">101</div>
+                            <h4>Binary</h4>
+                            <p>Binary encoding</p>
+                            <div class="profile-meta">
+                                <span class="tag">Binary</span>
+                                <span class="word-count">16 words</span>
+                            </div>
+                        </div>
+                        
+                        <div class="profile-card featured">
+                            <div class="profile-num">151</div>
+                            <h4>Space</h4>
+                            <p>Cosmos themed</p>
+                            <div class="profile-meta">
+                                <span class="tag">Space</span>
+                                <span class="word-count">32 words</span>
+                            </div>
+                        </div>
+                        
+                        <div class="profile-card">
+                            <div class="profile-num">201</div>
+                            <h4>Technology</h4>
+                            <p>Tech/Crypto themed</p>
+                            <div class="profile-meta">
+                                <span class="tag">Tech</span>
+                                <span class="word-count">32 words</span>
+                            </div>
+                        </div>
+                        
+                        <div class="profile-card">
+                            <div class="profile-num">291</div>
+                            <h4>Advanced 256</h4>
+                            <p>Full byte coverage</p>
+                            <div class="profile-meta">
+                                <span class="tag">Advanced</span>
+                                <span class="word-count">256 words</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="profile-preview">
+                        <h4 style="margin-bottom: 1rem; color: var(--primary);">
+                            <i class="fas fa-eye"></i> Profile Preview: 001_basic_16
+                        </h4>
+                        <div class="preview-content">
+                            <div class="preview-mapping">
+                                <div class="map-item">
+                                    <span class="map-word">abis</span>
+                                    <span class="map-arrow">→</span>
+                                    <span class="map-value">0</span>
+                                </div>
+                                <div class="map-item">
+                                    <span class="map-word">acelasi</span>
+                                    <span class="map-arrow">→</span>
+                                    <span class="map-value">1</span>
+                                </div>
+                                <div class="map-item">
+                                    <span class="map-word">acoperis</span>
+                                    <span class="map-arrow">→</span>
+                                    <span class="map-value">2</span>
+                                </div>
+                                <div class="map-item">
+                                    <span class="map-word">adanc</span>
+                                    <span class="map-arrow">→</span>
+                                    <span class="map-value">3</span>
+                                </div>
+                                <div class="map-item">
+                                    <span class="map-word">adapost</span>
+                                    <span class="map-arrow">→</span>
+                                    <span class="map-value">4</span>
+                                </div>
+                                <div class="map-item">
+                                    <span class="map-word">adorare</span>
+                                    <span class="map-arrow">→</span>
+                                    <span class="map-value">5</span>
+                                </div>
+                                <div class="map-item">
+                                    <span class="map-word">afectiune</span>
+                                    <span class="map-arrow">→</span>
+                                    <span class="map-value">6</span>
+                                </div>
+                                <div class="map-item">
+                                    <span class="map-word">aer</span>
+                                    <span class="map-arrow">→</span>
+                                    <span class="map-value">7</span>
+                                </div>
+                                <div class="map-item">
+                                    <span class="map-word">ajun</span>
+                                    <span class="map-arrow">→</span>
+                                    <span class="map-value">8</span>
+                                </div>
+                                <div class="map-item">
+                                    <span class="map-word">albastru</span>
+                                    <span class="map-arrow">→</span>
+                                    <span class="map-value">9</span>
+                                </div>
+                                <div class="map-item">
+                                    <span class="map-word">alb</span>
+                                    <span class="map-arrow">→</span>
+                                    <span class="map-value">a</span>
+                                </div>
+                                <div class="map-item">
+                                    <span class="map-word">alge</span>
+                                    <span class="map-arrow">→</span>
+                                    <span class="map-value">b</span>
+                                </div>
+                                <div class="map-item">
+                                    <span class="map-word">altar</span>
+                                    <span class="map-arrow">→</span>
+                                    <span class="map-value">c</span>
+                                </div>
+                                <div class="map-item">
+                                    <span class="map-word">amintire</span>
+                                    <span class="map-arrow">→</span>
+                                    <span class="map-value">d</span>
+                                </div>
+                                <div class="map-item">
+                                    <span class="map-word">amurg</span>
+                                    <span class="map-arrow">→</span>
+                                    <span class="map-value">e</span>
+                                </div>
+                                <div class="map-item">
+                                    <span class="map-word">anotimp</span>
+                                    <span class="map-arrow">→</span>
+                                    <span class="map-value">f</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Phrase to Key Converter -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <i class="fas fa-exchange-alt"></i>
+                        <h2>Phrase to Private Key</h2>
+                    </div>
+                    
+                    <div class="converter-form">
+                        <div class="form-group">
+                            <label>AKM Phrase (space separated)</label>
+                            <textarea id="akmPhrase" class="form-control mono" rows="3" 
+                                placeholder="abis acelasi acoperis adanc adapost"></textarea>
+                        </div>
+
+                        <div class="form-row" style="padding-bottom: 0;">
+                            <div class="form-group">
+                                <label>Selected Profile</label>
+                                <select id="convertProfile" class="form-control">
+                                    <option value="001">001 - Basic 16</option>
+                                    <option value="031">031 - Colors</option>
+                                    <option value="101">101 - Binary</option>
+                                    <option value="151">151 - Space</option>
+                                    <option value="291">291 - Advanced 256</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Checksum</label>
+                                <div class="btn-group">
+                                    <button class="btn-toggle active">V1</button>
+                                    <button class="btn-toggle">V2</button>
+                                    <button class="btn-toggle">None</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" id="convertBtn" style="margin: 0 1.5rem 1.5rem;">
+                            <i class="fas fa-exchange-alt"></i> Convert to Private Key
+                        </button>
+
+                        <div class="conversion-result" style="padding: 0 1.5rem 1.5rem;">
+                            <div class="result-box">
+                                <label>Private Key (HEX)</label>
+                                <div class="key-display" id="privKeyHex">
+                                    <span class="placeholder">Enter phrase and click convert...</span>
+                                </div>
+                            </div>
+                            <div class="result-box" style="margin-top: 1rem;">
+                                <label>Bitcoin Address</label>
+                                <div class="key-display" id="btcAddress">
+                                    <span class="placeholder">Derived address will appear here...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generate AKM Phrase -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <i class="fas fa-magic"></i>
+                        <h2>Generate AKM Phrase</h2>
+                    </div>
+                    
+                    <div class="generator-form">
+                        <div class="form-row" style="padding-bottom: 0;">
+                            <div class="form-group">
+                                <label>Seed (number or hex)</label>
+                                <input type="text" id="genSeed" class="form-control mono" 
+                                       placeholder="123456 or 0x1E240">
+                            </div>
+                            <div class="form-group">
+                                <label>Phrase Length</label>
+                                <select id="genLength" class="form-control">
+                                    <option value="5">5 words</option>
+                                    <option value="10" selected>10 words</option>
+                                    <option value="15">15 words</option>
+                                    <option value="20">20 words</option>
+                                    <option value="25">25 words</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="addChecksum" checked>
+                                <span class="checkmark"></span>
+                                Add checksum word
+                            </label>
+                        </div>
+
+                        <div class="action-buttons">
+                            <button class="btn btn-primary btn-large" id="generatePhrase">
+                                <i class="fas fa-magic"></i> Generate Phrase
+                            </button>
+                            <button class="btn btn-secondary" id="randomSeed">
+                                <i class="fas fa-random"></i> Random Seed
+                            </button>
+                        </div>
+
+                        <div class="generated-output" style="padding: 0 1.5rem 1.5rem;">
+                            <label>Generated Phrase</label>
+                            <div class="phrase-display" id="generatedPhrase">
+                                <span class="placeholder">Generated phrase will appear here...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Special Rules -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <i class="fas fa-cogs"></i>
+                        <h2>Special Rules</h2>
+                    </div>
+                    
+                    <div class="rules-list">
+                        <div class="rule-item">
+                            <div class="rule-icon">
+                                <i class="fas fa-lock"></i>
+                            </div>
+                            <div class="rule-info">
+                                <h4>fixed8</h4>
+                                <p>Complete 8-hex token is fixed</p>
+                                <code>word=12345678</code>
+                            </div>
+                        </div>
+                        
+                        <div class="rule-item">
+                            <div class="rule-icon">
+                                <i class="fas fa-code"></i>
+                            </div>
+                            <div class="rule-info">
+                                <h4>fixed3</h4>
+                                <p>First 3 nibbles fixed, rest from stream</p>
+                                <code>word=102 → 102xxxxx</code>
+                            </div>
+                        </div>
+                        
+                        <div class="rule-item">
+                            <div class="rule-icon">
+                                <i class="fas fa-puzzle-piece"></i>
+                            </div>
+                            <div class="rule-info">
+                                <h4>pad_nibble</h4>
+                                <p>Extend with repeated nibble</p>
+                                <code>pad=7 → 7777</code>
+                            </div>
+                        </div>
+                        
+                        <div class="rule-item">
+                            <div class="rule-icon">
+                                <i class="fas fa-redo"></i>
+                            </div>
+                            <div class="rule-info">
+                                <h4>repeat_last</h4>
+                                <p>Repeat last nibble of base</p>
+                                <code>abcd → abcddd</code>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-brand">
+                <i class="fas fa-key"></i>
+                <span>Bitcoin Recovery Tools</span>
+            </div>
+            <div class="footer-links">
+                <a href="index.html">Home</a>
+                <a href="SeedRecover.html">SeedRecover</a>
+                <a href="GpuCracker.html">GpuCracker</a>
+                <a href="build_bloom.html">Bloom Filter</a>
+            </div>
+            <div class="footer-copyright">
+                © 2025 Bitcoin Recovery Suite. Educational purposes only.
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/matrix.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/akm_tools.js"></script>
+</body>
+</html>

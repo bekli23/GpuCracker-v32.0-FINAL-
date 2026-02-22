@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GpuCracker - High Performance GPU Seed Cracker</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/tool.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <canvas id="matrixCanvas"></canvas>
+    
+    <nav class="navbar">
+        <div class="nav-brand">
+            <i class="fas fa-key"></i>
+            <span>BTCR tools</span>
+        </div>
+        <ul class="nav-menu">
+            <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="SeedRecover.html"><i class="fas fa-seedling"></i> SeedRecover</a></li>
+            <li><a href="GpuCracker.html" class="active"><i class="fas fa-microchip"></i> GpuCracker</a></li>
+            <li><a href="build_bloom.html"><i class="fas fa-filter"></i> Bloom Filter</a></li>
+            <li><a href="akm_seed2priv.html"><i class="fas fa-lock"></i> AKM Tools</a></li>
+        </ul>
+        <div class="hamburger">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    </nav>
+
+    <main class="tool-page">
+        <div class="tool-header">
+            <div class="tool-icon-large">
+                <i class="fas fa-microchip"></i>
+            </div>
+            <h1>GpuCracker</h1>
+            <p class="tool-subtitle">High-Performance GPU Seed Cracker with 100+ Coin Support</p>
+        </div>
+
+        <div class="tool-container">
+            <div class="tool-sidebar">
+                <div class="info-card">
+                    <h3><i class="fas fa-bolt"></i> Performance</h3>
+                    <div class="stat-row">
+                        <span>RTX 4090</span>
+                        <strong>150M+ keys/s</strong>
+                    </div>
+                    <div class="stat-row">
+                        <span>RTX 3090</span>
+                        <strong>100M+ keys/s</strong>
+                    </div>
+                    <div class="stat-row">
+                        <span>RX 6900 XT</span>
+                        <strong>80M+ keys/s</strong>
+                    </div>
+                    <div class="stat-row">
+                        <span>Apple M2</span>
+                        <strong>15M+ keys/s</strong>
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <h3><i class="fas fa-coins"></i> Supported Coins</h3>
+                    <p>100+ cryptocurrencies via BIP44:</p>
+                    <div class="coin-tags">
+                        <span class="tag">BTC</span>
+                        <span class="tag">ETH</span>
+                        <span class="tag">LTC</span>
+                        <span class="tag">DOGE</span>
+                        <span class="tag">DASH</span>
+                        <span class="tag">BCH</span>
+                        <span class="tag">BSV</span>
+                        <span class="tag">ZEC</span>
+                        <span class="tag">+92 more</span>
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <h3><i class="fas fa-puzzle-piece"></i> Puzzle Mode</h3>
+                    <p>Currently active puzzles:</p>
+                    <ul>
+                        <li><strong>#71</strong> - 7.1 BTC (~$600K)</li>
+                        <li><strong>#72</strong> - 7.2 BTC (~$610K)</li>
+                        <li><strong>#73</strong> - 7.3 BTC (~$620K)</li>
+                        <li><strong>#74</strong> - 7.4 BTC (~$630K)</li>
+                    </ul>
+                    <a href="#puzzle-section" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
+                        <i class="fas fa-play"></i> Start Puzzle
+                    </a>
+                </div>
+            </div>
+
+            <div class="tool-main">
+                <!-- Mode Selection -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <i class="fas fa-layer-group"></i>
+                        <h2>Operation Mode</h2>
+                    </div>
+                    
+                    <div class="mode-selector">
+                        <div class="mode-card active" data-mode="puzzle">
+                            <i class="fas fa-puzzle-piece"></i>
+                            <h4>Puzzle Mode</h4>
+                            <p>Bitcoin Puzzle Challenge</p>
+                        </div>
+                        <div class="mode-card" data-mode="akm">
+                            <i class="fas fa-lock"></i>
+                            <h4>AKM Mode</h4>
+                            <p>Custom profiles</p>
+                        </div>
+                        <div class="mode-card" data-mode="mnemonic">
+                            <i class="fas fa-seedling"></i>
+                            <h4>Mnemonic</h4>
+                            <p>BIP39 generation</p>
+                        </div>
+                        <div class="mode-card" data-mode="xprv">
+                            <i class="fas fa-key"></i>
+                            <h4>XPRV Mode</h4>
+                            <p>Extended keys</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Puzzle Selection -->
+                <div class="panel" id="puzzle-section">
+                    <div class="panel-header">
+                        <i class="fas fa-trophy"></i>
+                        <h2>Select Puzzle <span class="badge">916.5 BTC Total</span></h2>
+                    </div>
+                    
+                    <div class="puzzle-selector">
+                        <div class="puzzle-option selected">
+                            <div class="puzzle-num">#71</div>
+                            <div class="puzzle-reward">7.1 BTC</div>
+                        </div>
+                        <div class="puzzle-option">
+                            <div class="puzzle-num">#72</div>
+                            <div class="puzzle-reward">7.2 BTC</div>
+                        </div>
+                        <div class="puzzle-option">
+                            <div class="puzzle-num">#73</div>
+                            <div class="puzzle-reward">7.3 BTC</div>
+                        </div>
+                        <div class="puzzle-option">
+                            <div class="puzzle-num">#74</div>
+                            <div class="puzzle-reward">7.4 BTC</div>
+                        </div>
+                        <div class="puzzle-option">
+                            <div class="puzzle-num">#76</div>
+                            <div class="puzzle-reward">7.6 BTC</div>
+                        </div>
+                        <div class="puzzle-option">
+                            <div class="puzzle-num">#77</div>
+                            <div class="puzzle-reward">7.7 BTC</div>
+                        </div>
+                        <div class="puzzle-option">
+                            <div class="puzzle-num">#78</div>
+                            <div class="puzzle-reward">7.8 BTC</div>
+                        </div>
+                        <div class="puzzle-option">
+                            <div class="puzzle-num">#79</div>
+                            <div class="puzzle-reward">7.9 BTC</div>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="padding-top: 0;">
+                        <label>Search Strategy</label>
+                        <div class="btn-group">
+                            <button class="btn-toggle active">Sequential</button>
+                            <button class="btn-toggle">Random</button>
+                            <button class="btn-toggle">Distributed</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GPU Configuration -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <i class="fas fa-microchip"></i>
+                        <h2>GPU Configuration</h2>
+                    </div>
+                    
+                    <div class="gpu-config-grid">
+                        <div class="gpu-card selected">
+                            <div class="gpu-card-header">
+                                <i class="fas fa-microchip"></i>
+                                <h4>NVIDIA CUDA</h4>
+                            </div>
+                            <p>RTX 4090 (24GB)</p>
+                            <div class="gpu-stats">
+                                <span><i class="fas fa-tachometer-alt"></i> 150M/s</span>
+                                <span><i class="fas fa-thermometer-half"></i> 65°C</span>
+                            </div>
+                        </div>
+                        
+                        <div class="gpu-card">
+                            <div class="gpu-card-header">
+                                <i class="fab fa-apple"></i>
+                                <h4>Apple Metal</h4>
+                            </div>
+                            <p>M2 Max (32GB)</p>
+                            <div class="gpu-stats">
+                                <span><i class="fas fa-tachometer-alt"></i> 15M/s</span>
+                                <span><i class="fas fa-thermometer-half"></i> 58°C</span>
+                            </div>
+                        </div>
+                        
+                        <div class="gpu-card">
+                            <div class="gpu-card-header">
+                                <i class="fas fa-microchip"></i>
+                                <h4>OpenCL</h4>
+                            </div>
+                            <p>AMD RX 6900 XT</p>
+                            <div class="gpu-stats">
+                                <span><i class="fas fa-tachometer-alt"></i> 80M/s</span>
+                                <span><i class="fas fa-thermometer-half"></i> 72°C</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="blocks">CUDA Blocks</label>
+                            <input type="number" id="blocks" class="form-control" value="256" min="1" max="1024">
+                        </div>
+                        <div class="form-group">
+                            <label for="threads">Threads per Block</label>
+                            <input type="number" id="threads" class="form-control" value="512" min="1" max="1024">
+                        </div>
+                        <div class="form-group">
+                            <label for="points">Points/Thread</label>
+                            <input type="number" id="points" class="form-control" value="100" min="1" max="1000">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bloom Filter -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <i class="fas fa-filter"></i>
+                        <h2>Bloom Filter</h2>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="bloomFiles">Bloom Filter Files (.blf)</label>
+                        <input type="file" id="bloomFiles" class="form-control" multiple accept=".blf">
+                        <small class="form-hint">Select one or more Bloom filter files for address matching</small>
+                    </div>
+
+                    <div class="bloom-stats" style="padding: 0 1.5rem 1.5rem;">
+                        <div class="stat-row">
+                            <span><i class="fas fa-file"></i> Loaded Files</span>
+                            <strong id="bloomFileCount">0</strong>
+                        </div>
+                        <div class="stat-row">
+                            <span><i class="fas fa-database"></i> Total Size</span>
+                            <strong id="bloomSize">0 MB</strong>
+                        </div>
+                        <div class="stat-row">
+                            <span><i class="fas fa-address-card"></i> Estimated Addresses</span>
+                            <strong id="bloomCapacity">0</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Output -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <i class="fas fa-terminal"></i>
+                        <h2>Live Output</h2>
+                        <div style="margin-left: auto;">
+                            <span class="status-badge status-pending" id="statusBadge">
+                                <i class="fas fa-circle"></i> Ready
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="terminal-output" id="terminalOutput">
+                        <div class="terminal-line info">[INFO] GpuCracker v42.2 initialized</div>
+                        <div class="terminal-line info">[INFO] Detected GPU: NVIDIA RTX 4090 (24GB)</div>
+                        <div class="terminal-line info">[INFO] CUDA Version: 12.4</div>
+                        <div class="terminal-line">[CONFIG] Blocks: 256, Threads: 512, Points: 100</div>
+                        <div class="terminal-line">[PUZZLE] Selected: #71 (7.1 BTC)</div>
+                        <div class="terminal-line">[RANGE] 0x400000000000000000 to 0x7fffffffffffffffff</div>
+                        <div class="terminal-line info">[READY] Waiting to start...</div>
+                    </div>
+
+                    <div class="progress-section" style="border-top: 1px solid rgba(255,255,255,0.05);">
+                        <div class="progress-header">
+                            <span class="progress-label">Search Progress</span>
+                            <span class="progress-percent" id="searchProgress">0.000000001%</span>
+                        </div>
+                        <div class="progress-bar-large">
+                            <div class="progress-fill-large" id="searchBar" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-stats">
+                            <div class="progress-stat">
+                                <i class="fas fa-clock"></i>
+                                <span id="searchTime">00:00:00</span>
+                            </div>
+                            <div class="progress-stat">
+                                <i class="fas fa-tachometer-alt"></i>
+                                <span id="searchSpeed">0 Mkeys/s</span>
+                            </div>
+                            <div class="progress-stat">
+                                <i class="fas fa-key"></i>
+                                <span id="keysChecked">0 / 2^71</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn btn-primary btn-large" id="startCracking">
+                            <i class="fas fa-rocket"></i> Start Cracking
+                        </button>
+                        <button class="btn btn-secondary btn-large" id="stopCracking" disabled>
+                            <i class="fas fa-stop"></i> Stop
+                        </button>
+                        <button class="btn btn-secondary" id="saveOutput">
+                            <i class="fas fa-save"></i> Save Log
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-brand">
+                <i class="fas fa-key"></i>
+                <span>Bitcoin Recovery Tools</span>
+            </div>
+            <div class="footer-links">
+                <a href="index.html">Home</a>
+                <a href="SeedRecover.html">SeedRecover</a>
+                <a href="build_bloom.html">Bloom Filter</a>
+                <a href="akm_seed2priv.html">AKM Tools</a>
+            </div>
+            <div class="footer-copyright">
+                © 2025 Bitcoin Recovery Suite. Educational purposes only.
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/matrix.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/gpucracker.js"></script>
+</body>
+</html>
