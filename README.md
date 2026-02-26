@@ -54,16 +54,16 @@ make -j$(nproc)
 
 ## 📚 Mode Overview & Analysis
 
-| Mode | Use Case | Speed | Best For |
-|------|----------|-------|----------|
-| **mnemonic** | BIP39 seed recovery | Medium | Lost wallet seeds |
-| **akm** | Advanced Key Mapping | Fast | Cryptographic puzzles |
-| **check** | Address verification | Very Fast | Database validation |
-| **scan** | Blockchain scanning | Fast | Active monitoring |
-| **xprv-mode** | Extended key derivation | Medium | HD wallet analysis |
-| **brainwallet** | Password-based wallets | Slow | Weak passwords |
-| **pubkey** | Public key brute force | Very Fast | Bitcoin puzzles |
-| **bsgs** | Baby Step Giant Step | Medium | DLP attacks |
+| Mode | Use Case | Speed | GPU Support | Best For |
+|------|----------|-------|-------------|----------|
+| **mnemonic** | BIP39 seed recovery | Medium | ✅ Yes | Lost wallet seeds |
+| **akm** | Advanced Key Mapping | Fast | ✅ Yes | Cryptographic puzzles |
+| **check** | Address verification | Very Fast | ✅ Yes | Database validation |
+| **scan** | Blockchain scanning | Fast | ✅ Yes | Active monitoring |
+| **xprv-mode** | Extended key derivation | Medium | ✅ Yes | HD wallet analysis |
+| **brainwallet** | Password-based wallets | Slow | ✅ Yes | Weak passwords |
+| **pubkey** | Public key brute force | Medium | ⚠️ CPU Only | Bitcoin puzzles |
+| **bsgs** | Baby Step Giant Step | Medium | ❌ No | DLP attacks |
 
 ---
 
@@ -385,8 +385,13 @@ GpuCracker.exe --mode brainwallet \
 
 ## 🔑 Mode 7: PUBKEY (Public Key Recovery)
 
+### ⚠️ IMPORTANT: GPU Mode Limitation
+**Currently Pubkey mode only works in CPU mode. GPU (CUDA) support is under development.**
+
+The GPU kernel exists but requires additional fixes for proper hash160 calculation and modular arithmetic. Use CPU mode for reliable operation.
+
 ### Description
-Brute-force search for private keys from public addresses within specific bit ranges. GPU-optimized for Bitcoin puzzles.
+Brute-force search for private keys from public addresses within specific bit ranges. Optimized for Bitcoin puzzles (currently CPU-only).
 
 ### Parameters
 ```
@@ -395,18 +400,18 @@ Brute-force search for private keys from public addresses within specific bit ra
 --pub-bit-start N      Starting bit
 --pub-bit-end N        Ending bit
 --pub-type TYPE        auto, p2pkh, p2sh, p2wpkh
---pubkey-blocks N      GPU blocks (default: 512)
---pubkey-threads N     GPU threads per block (default: 512)
+--pubkey-blocks N      GPU blocks (default: 512) - CPU only
+--pubkey-threads N     GPU threads per block (default: 512) - CPU only
 ```
 
 ### Basic Examples
 ```bash
-# Puzzle 71 with GPU
+# Puzzle 71 with CPU (RECOMMENDED)
 GpuCracker.exe --mode pubkey \
     --pub-address 13zb1hQbWVsc2S7ZTZnP2G4undNNpdh5so \
-    --pub-bit 71 --type cuda
+    --pub-bit 71 --type cpu
 
-# CPU mode for smaller ranges
+# Smaller ranges
 GpuCracker.exe --mode pubkey \
     --pub-address 1PWo3JeB9jrGwfHDNpdGK54CRas7fsVzXU \
     --pub-bit 40 --type cpu
@@ -414,39 +419,52 @@ GpuCracker.exe --mode pubkey \
 # Custom bit range
 GpuCracker.exe --mode pubkey \
     --pub-address 13zb1hQbWVsc2S7ZTZnP2G4undNNpdh5so \
-    --pub-bit-start 66 --pub-bit-end 71
+    --pub-bit-start 66 --pub-bit-end 71 \
+    --type cpu
 ```
 
 ### Advanced Combinations
 ```bash
-# High-performance setup
+# Multi-threaded CPU (recommended for now)
 GpuCracker.exe --mode pubkey \
     --pub-address 13zb1hQbWVsc2S7ZTZnP2G4undNNpdh5so \
-    --pub-bit 71 --type cuda --device 0 \
-    --pubkey-blocks 1024 --pubkey-threads 512 \
+    --pub-bit 71 --type cpu \
+    --cpu-cores 16 \
     --bloom-keys puzzle71.blf
-
-# Multi-GPU distributed
-GpuCracker.exe --mode pubkey \
-    --pub-address 13zb1hQbWVsc2S7ZTZnP2G4undNNpdh5so \
-    --pub-bit 71 --type cuda --device 0,1,2,3 \
-    --show-real-speed
 
 # With custom address type
 GpuCracker.exe --mode pubkey \
     --pub-address bc1q... \
     --pub-bit 71 --pub-type p2wpkh \
-    --type cuda
+    --type cpu
 ```
 
-### Performance Analysis
+### Performance Analysis (CPU Mode)
 | Hardware | Speed (keys/s) | Time for 2^71 |
 |----------|----------------|---------------|
+| CPU (8 cores) | ~80,000 | ~6,000 years |
 | CPU (16 cores) | ~160,000 | ~3,000 years |
-| GTX 1060 | ~50M | ~10 years |
-| RTX 3090 | ~500M | ~1 year |
-| RTX 4090 | ~1B | ~6 months |
-| 4x RTX 4090 | ~4B | ~1.5 months |
+| CPU (32 cores) | ~320,000 | ~1,500 years |
+| CPU (64 cores) | ~640,000 | ~750 years |
+
+### 🔧 GPU Mode Status
+| Feature | Status | Notes |
+|---------|--------|-------|
+| CPU Mode | ✅ Working | Fully functional |
+| CUDA GPU | ⚠️ In Development | Hash160 calculation needs fixes |
+| OpenCL GPU | ❌ Not Available | Future implementation |
+
+### Known Issues
+1. **GPU mode falls back to CPU** - Even with `--type cuda`, pubkey mode currently uses CPU
+2. **Hash160 mismatch in GPU kernel** - The GPU kernel produces different hash160 results than CPU
+3. **Modular arithmetic** - Point multiplication on GPU needs verification
+
+### Workaround for GPU Speed
+For GPU acceleration, use **AKM mode** instead which has working GPU support:
+```bash
+# Use AKM mode for GPU puzzle solving
+GpuCracker.exe --mode akm --akm-bit 71 --type cuda --device 0
+```
 
 ---
 
